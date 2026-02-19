@@ -270,6 +270,7 @@ const server = http.createServer(async (req, res) => {
 let autoRefreshInterval = null;
 
 async function autoRefreshOddsAndResults() {
+  try {
   const hour = new Date().getUTCHours() + 1; // UTC+1 Ireland/UK
   if (hour < 11 || hour >= 18) return;
   console.log('Auto-refresh running...');
@@ -352,6 +353,7 @@ async function autoRefreshOddsAndResults() {
       } catch(e) { console.log('Results error:', e.message); }
     }
   } catch(e) { console.log('Auto-refresh error:', e.message); }
+  } catch(e) { console.log('Auto-refresh fatal error (server continues):', e.message); }
 }
 
 server.listen(PORT, () => {
@@ -365,6 +367,9 @@ server.listen(PORT, () => {
   }
   console.log('Routes: /health  /odds  /api/*  /debug-results');
   console.log('');
-  autoRefreshOddsAndResults();
-  autoRefreshInterval = setInterval(autoRefreshOddsAndResults, 30 * 60 * 1000);
+  // Delay first run by 10 seconds to let server fully initialise
+  setTimeout(() => {
+    autoRefreshOddsAndResults();
+    autoRefreshInterval = setInterval(autoRefreshOddsAndResults, 30 * 60 * 1000);
+  }, 10000);
 });
