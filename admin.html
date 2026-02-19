@@ -496,7 +496,7 @@
       // Scrape odds and merge into saved races
       showToast('📊 Fetching odds…','info');
       try {
-        const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(venue)}&date=${date}`);
+        const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(venue)}&date=${date}`);
         const oddsData = await oddsResp.json();
         if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
           const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',date)));
@@ -540,7 +540,7 @@
     this.disabled=true; this.textContent='⏳ Fetching…';
     // Also refresh scraped odds
     try {
-      const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
       const oddsData = await oddsResp.json();
       if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
         const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
@@ -620,7 +620,7 @@
     if (!activeMeeting){showToast('No active meeting','error');return;}
     this.disabled=true; this.textContent='⏳ Fetching odds…';
     try {
-      const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
       const oddsData = await oddsResp.json();
       if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
         const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
