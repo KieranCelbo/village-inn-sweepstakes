@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Village Inn Sweepstakes — Login</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      background: var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    .login-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .login-top {
+      text-align: center;
+      margin-bottom: 32px;
+      color: white;
+    }
+
+    .login-top .horse-icon {
+      font-size: 4rem;
+      display: block;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+    }
+
+    .login-top h1 {
+      font-size: 2.2rem;
+      color: var(--gold-light);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .login-top p {
+      color: rgba(255,255,255,0.65);
+      margin-top: 6px;
+    }
+
+    .login-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .login-card-header {
+      background: var(--gold);
+      padding: 20px 28px;
+      text-align: center;
+    }
+
+    .login-card-header h2 {
+      font-size: 1.1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+
+    .login-card-body {
+      padding: 32px 28px;
+    }
+
+    .login-card-body .form-input {
+      font-size: 1.1rem;
+      padding: 16px 18px;
+    }
+
+    .login-card-body .btn-primary {
+      width: 100%;
+      justify-content: center;
+      padding: 16px;
+      font-size: 1.1rem;
+      margin-top: 8px;
+    }
+
+    .login-divider {
+      text-align: center;
+      margin: 12px 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    #login-error {
+      display: none;
+    }
+
+    .login-footer {
+      text-align: center;
+      padding: 16px;
+      background: var(--cream);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-top">
+      <span class="horse-icon">🏇</span>
+      <h1>The Village Inn Sweepstakes</h1>
+      <p>The Races — 2025 Festival</p>
+    </div>
+    <div class="login-card">
+      <div class="login-card-header">
+        <h2>Sign In to Your Account</h2>
+      </div>
+      <div class="login-card-body">
+        <div id="login-error" class="alert alert-error">
+          Invalid username or password. Please try again.
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input type="text" id="username" class="form-input" placeholder="Enter your username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" class="form-input" placeholder="Enter your password" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" id="login-btn" onclick="handleLogin()">
+          🏁 Sign In
+        </button>
+      </div>
+      <div class="login-footer">
+        The Village Inn Sweepstakes Sweepstakes &copy; 2025
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+      authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+      projectId: "cheltenham-sweepstakes"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Helper: find user profile by UID, checking both 'users' and 'Users' collection names
+    async function getUserProfile(uid) {
+      let snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) return snap;
+      snap = await getDoc(doc(db, 'Users', uid));
+      if (snap.exists()) return snap;
+      return null;
+    }
+
+    // Try signing in with multiple possible email formats for a given username+password
+    async function trySignIn(username, password) {
+      const emailsToTry = [];
+
+      // If they typed a full email address, try it directly first
+      if (username.includes('@')) {
+        emailsToTry.push(username);
+      } else {
+        // Try the @cheltenham.local format (for players added via admin panel)
+        emailsToTry.push(username.toLowerCase() + '@cheltenham.local');
+        // Also try common real-email suffixes the admin account might use
+        // (We store the real email in Firestore but can't query it pre-auth,
+        //  so we try @cheltenham.local first, then ask user to type full email)
+      }
+
+      let lastErr = null;
+      for (const email of emailsToTry) {
+        try {
+          console.log('Trying:', email);
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          return cred;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr;
+    }
+
+    // Check if already logged in
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDoc = await getUserProfile(user.uid);
+        if (userDoc && userDoc.exists()) {
+          const role = userDoc.data().role;
+          window.location.href = role === 'admin' ? 'admin.html' : 'user.html';
+        }
+      }
+    });
+
+    window.handleLogin = async function() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('login-btn');
+      const errorEl = document.getElementById('login-error');
+
+      if (!username || !password) {
+        errorEl.textContent = 'Please enter your username and password.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Signing in…';
+      errorEl.style.display = 'none';
+
+      try {
+        const cred = await trySignIn(username, password);
+        
+        const userDoc = await getUserProfile(cred.user.uid);
+        if (!userDoc || !userDoc.exists()) {
+          throw new Error('profile not found');
+        }
+
+        const role = userDoc.data().role;
+        window.location.href = role === 'admin' ? 'admin.html' : 'user.html';
+
+      } catch (err) {
+        console.error('Login error:', err.code, err.message);
+        let msg = 'Invalid username or password. Please try again.';
+        if (err.message && err.message.includes('profile not found')) {
+          msg = 'Login OK but profile missing — contact admin.';
+        }
+        errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '🏁 Sign In';
+      }
+    };
+
+    // Allow Enter key to submit
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') window.handleLogin();
+    });
+  </script>
+</body>
+</html>

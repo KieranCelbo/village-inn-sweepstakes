@@ -1,0 +1,12 @@
+// firestore.rules
+// Paste into Firebase Console → Firestore → Rules tab and click Publish
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Any logged-in user can read/write — fine for a private pub sweepstakes
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

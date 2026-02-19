@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Picks — The Village Inn Sweepstakes</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== PAGE HEADER ===== */
+    .page-header {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-mid) 100%);
+      color: white;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .page-header h2 { color: var(--gold-light); font-size: 1.6rem; margin: 0; }
+    .page-header p { color: rgba(255,255,255,0.7); margin-top: 4px; font-size: 0.9rem; }
+
+    .meeting-badge {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .meeting-badge .meeting-venue { font-size: 1.1rem; color: var(--gold-light); }
+    .meeting-badge .meeting-date { font-size: 0.8rem; opacity: 0.8; margin-top: 2px; }
+
+    /* ===== TABS ===== */
+    .user-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--cream-dark);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .user-tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .user-tab-btn.active {
+      background: var(--white);
+      color: var(--green);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .user-tab-panel { display: none; }
+    .user-tab-panel.active { display: block; }
+
+    /* ===== SUMMARY STRIP ===== */
+    .picks-summary {
+      background: var(--green);
+      color: white;
+      border-radius: var(--radius-lg);
+      padding: 18px 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    @media(max-width:600px){ .picks-summary { grid-template-columns: repeat(2,1fr); } }
+    .summary-stat { text-align: center; padding: 4px; }
+    .summary-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--gold-light);
+      line-height: 1;
+    }
+    .summary-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    /* ===== RACE CARD ===== */
+    .race-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .race-card:hover { box-shadow: var(--shadow-lg); }
+
+    .race-card-header {
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-bottom: 2px solid var(--cream-dark);
+    }
+    .race-card-header.locked {
+      background: #faf5f5;
+      border-bottom-color: #f0d0d0;
+    }
+    .race-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+    .race-time {
+      background: var(--green);
+      color: white;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .race-time.locked-time { background: #b0b0b0; }
+
+    .race-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.3;
+    }
+    .race-info { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; }
+
+    .race-status-area { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .countdown { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+    .countdown.urgent { color: var(--red); }
+
+    .picked-badge {
+      background: var(--green);
+      color: white;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    /* ===== HORSE GRID ===== */
+    .horses-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 16px 20px;
+    }
+    @media(max-width:600px) {
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+    }
+
+    .horse-card {
+      border: 2px solid var(--cream-dark);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.18s;
+      position: relative;
+      background: var(--white);
+      user-select: none;
+    }
+    .horse-card:hover:not(.locked-card):not(.picked) {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.05);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(201,168,76,0.18);
+    }
+    .horse-card.picked {
+      border-color: var(--green);
+      background: rgba(27,77,46,0.05);
+      box-shadow: 0 0 0 3px rgba(27,77,46,0.12);
+    }
+    .horse-card.locked-card { cursor: default; opacity: 0.7; }
+    .horse-card.nr-card { opacity: 0.5; cursor: default; }
+
+    .horse-number {
+      position: absolute;
+      top: 9px; right: 10px;
+      width: 24px; height: 24px;
+      background: var(--cream-dark);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+    }
+    .horse-check {
+      position: absolute;
+      top: -7px; left: -7px;
+      width: 24px; height: 24px;
+      background: var(--green);
+      border-radius: 50%;
+      display: none;
+      align-items: center; justify-content: center;
+      color: white; font-size: 0.85rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .horse-card.picked .horse-check { display: flex; }
+
+    .horse-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-right: 28px;
+      line-height: 1.2;
+    }
+    .horse-card.picked .horse-name { color: var(--green); }
+
+    .horse-odds {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--gold-dark);
+      margin: 5px 0 3px;
+      font-family: 'Playfair Display', serif;
+    }
+    .horse-nr { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 4px 0; }
+
+    .horse-details {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ===== LOCKED STATE ===== */
+    .race-locked-msg {
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #9b4040;
+      font-weight: 600;
+      font-size: 0.95rem;
+      background: rgba(192,57,43,0.04);
+    }
+
+    /* ===== RESULT BAR ===== */
+    .race-result-bar {
+      padding: 12px 22px;
+      background: rgba(201,168,76,0.1);
+      border-top: 1px solid rgba(201,168,76,0.2);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 0.88rem;
+    }
+    .winner-label { font-weight: 700; color: var(--green); }
+    .place-label { color: var(--text-muted); }
+    .pick-outcome-win { color: var(--green); font-weight: 700; }
+    .pick-outcome-place { color: #c08000; font-weight: 700; }
+    .pick-outcome-lose { color: var(--red); font-weight: 600; }
+
+    .points-badge {
+      margin-left: auto;
+      background: var(--green);
+      color: white;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .points-badge.place-points { background: #c08000; }
+
+    /* ===== MY PICKS TAB ===== */
+    .picks-day-group {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .picks-day-header {
+      background: var(--green);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .picks-day-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--gold-light); }
+    .picks-day-points { font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; }
+    .picks-day-venue { font-size: 0.8rem; opacity: 0.75; margin-top: 1px; }
+
+    .pick-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--cream-dark);
+      font-size: 0.88rem;
+    }
+    .pick-row:last-child { border-bottom: none; }
+    .pick-time {
+      background: var(--cream-dark);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+    .pick-horse { font-weight: 700; color: var(--text); font-family: 'Playfair Display', serif; }
+    .pick-race { color: var(--text-muted); font-size: 0.78rem; flex: 1; }
+    .pick-result-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .badge-win { background: rgba(27,77,46,0.12); color: var(--green); }
+    .badge-place { background: rgba(192,128,0,0.12); color: #c08000; }
+    .badge-lose { background: rgba(192,57,43,0.1); color: var(--red); }
+    .badge-pending { background: var(--cream-dark); color: var(--text-muted); }
+    .badge-no-pick { background: var(--cream-dark); color: var(--text-muted); font-style: italic; }
+
+    .pick-points { font-weight: 700; color: var(--green); font-size: 0.85rem; flex-shrink: 0; }
+    .pick-points.place-pts { color: #c08000; }
+
+    .picks-empty {
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .picks-empty .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+    /* ===== SCORING INFO ===== */
+    .scoring-info {
+      background: linear-gradient(135deg, rgba(27,77,46,0.06), rgba(201,168,76,0.06));
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .scoring-info strong { color: var(--green); }
+    .scoring-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+    .scoring-rule { display: flex; align-items: center; gap: 8px; }
+    .scoring-pts { font-weight: 800; color: var(--gold-dark); font-family: 'Playfair Display', serif; font-size: 1rem; }
+
+    /* ===== USER MOBILE ===== */
+    @media (max-width: 768px) {
+      .page-header { padding: 16px 18px; border-radius: 14px; }
+      .page-header h2 { font-size: 1.3rem; }
+      .meeting-badge { padding: 8px 14px; }
+      .meeting-badge .meeting-venue { font-size: 1rem; }
+
+      .picks-summary { padding: 14px 16px; gap: 6px; }
+      .summary-num { font-size: 1.6rem; }
+      .summary-label { font-size: 0.7rem; }
+
+      .user-tabs { margin-bottom: 16px; }
+      .user-tab-btn { padding: 9px 10px; font-size: 0.82rem; }
+
+      .scoring-info { padding: 12px 14px; font-size: 0.8rem; }
+      .scoring-grid { gap: 10px; }
+
+      .race-card { border-radius: 14px; margin-bottom: 14px; }
+      .race-card-header { padding: 12px 14px; gap: 8px; }
+      .race-time { font-size: 1.1rem; padding: 6px 12px; }
+      .race-name { font-size: 0.95rem; }
+      .race-info { font-size: 0.75rem; }
+      .race-status-area { gap: 6px; }
+      .lock-badge { font-size: 0.78rem; padding: 4px 10px; }
+      .countdown { font-size: 0.75rem; }
+
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px; }
+      .horse-card { padding: 10px 12px; border-radius: 10px; }
+      .horse-name { font-size: 0.85rem; margin-right: 24px; }
+      .horse-odds { font-size: 1rem; }
+      .horse-details { font-size: 0.68rem; }
+      .horse-number { width: 22px; height: 22px; font-size: 0.68rem; }
+      .horse-check { width: 20px; height: 20px; font-size: 0.75rem; top: -6px; left: -6px; }
+
+      .race-result-bar { padding: 10px 14px; font-size: 0.82rem; gap: 8px; }
+      .race-locked-msg { padding: 12px 14px; font-size: 0.85rem; }
+
+      .picks-day-header { padding: 10px 14px; }
+      .picks-day-title { font-size: 1rem; }
+      .pick-row { padding: 10px 14px; gap: 10px; font-size: 0.82rem; }
+      .pick-time { font-size: 0.75rem; padding: 3px 8px; }
+      .pick-horse { font-size: 0.88rem; }
+      .pick-race { font-size: 0.72rem; }
+    }
+
+    @media (max-width: 420px) {
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 10px; }
+      .horse-card { padding: 8px 10px; }
+      .horse-name { font-size: 0.8rem; }
+      .picks-summary { grid-template-columns: repeat(2, 1fr); }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .meeting-badge { width: 100%; }
+    }
+
+    /* Prevent iOS input zoom */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* Better tap targets */
+    .horse-card { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .user-tab-btn { touch-action: manipulation; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="logo-icon">🏇</div>
+      <div>
+        <h1>The Village Inn Sweepstakes</h1>
+        <p id="user-welcome">Loading…</p>
+      </div>
+    </div>
+    <div class="nav-user">
+      <div class="nav-user-info">
+        <div class="name" id="user-name">—</div>
+        <div class="role">Player</div>
+      </div>
+      <button class="btn-logout" onclick="window.logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h2>🏁 Sweepstakes</h2>
+        <p>Pick one horse per race. Picks lock 30 minutes before the off.</p>
+      </div>
+      <div class="meeting-badge">
+        <div class="meeting-venue" id="meeting-venue-display">Loading…</div>
+        <div class="meeting-date" id="meeting-date-display">—</div>
+      </div>
+    </div>
+
+    <!-- Summary strip -->
+    <div class="picks-summary">
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-races">—</div>
+        <div class="summary-label">Today's Races</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-picked">—</div>
+        <div class="summary-label">My Picks</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-points">0</div>
+        <div class="summary-label">My Points</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-open">—</div>
+        <div class="summary-label">Open to Pick</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="user-tabs">
+      <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
+      <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
+    </div>
+
+    <!-- TAB: Races -->
+    <div class="user-tab-panel active" id="utab-races">
+      <!-- Scoring key -->
+      <div class="scoring-info">
+        <strong>📊 How points work:</strong>
+        <div class="scoring-grid">
+          <div class="scoring-rule"><span class="scoring-pts">10pts</span> Winner (all races)</div>
+          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 1 place &nbsp;|&nbsp; 8–14 runners: 2 places &nbsp;|&nbsp; 15+ runners: 3rd &amp; 4th also score</div>
+        </div>
+      </div>
+      <div id="races-container">
+        <div class="loading-center">
+          <div class="loading-spinner"></div>
+          <span style="font-size:1.1rem;">Loading races…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: My Picks -->
+    <div class="user-tab-panel" id="utab-mypicks">
+      <div id="mypicks-container">
+        <div class="loading-center">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+      authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+      projectId: "cheltenham-sweepstakes"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    let currentUser  = null;
+    let allRaces     = [];
+    let myPicks      = {};   // raceId -> pick doc
+    let allMyPicks   = [];   // all picks across all dates for My Picks tab
+    let activeMeetingData = null;
+
+    // ===== SCORING =====
+    function getPlaceCount(runnerCount) {
+      if (runnerCount <= 7)  return 1;
+      if (runnerCount <= 14) return 2;
+      return 4; // 15+ runners: winner + 3 places (2nd/3rd/4th)
+    }
+
+    function calcPoints(race, horseName) {
+      if (!race.result || !horseName) return 0;
+      const n = (race.runners || []).length;
+      const places = getPlaceCount(n);
+      const { winner, second, third, fourth } = race.result;
+      if (horseName === winner) return 10;
+      if (places >= 1 && horseName === second) return 5;
+      if (places >= 3 && horseName === third)  return 5;
+      if (places >= 4 && horseName === fourth) return 5;  // 15+ only
+      return 0;
+    }
+
+    function getOutcomeLabel(race, horseName) {
+      if (!race.result || !horseName) return null;
+      const n = (race.runners || []).length;
+      const places = getPlaceCount(n);
+      const { winner, second, third, fourth } = race.result;
+      if (horseName === winner)                          return 'win';
+      if (places >= 1 && horseName === second)           return 'place';
+      if (places >= 3 && horseName === third)            return 'place';
+      if (places >= 4 && horseName === fourth)           return 'place';
+      return 'lose';
+    }
+
+    // ===== AUTH =====
+    async function getUserProfile(uid) {
+      let snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) return snap;
+      snap = await getDoc(doc(db, 'Users', uid));
+      return snap.exists() ? snap : null;
+    }
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) { window.location.href = 'index.html'; return; }
+      const ud = await getUserProfile(user.uid);
+      if (!ud || !ud.exists()) { window.location.href = 'index.html'; return; }
+      currentUser = { uid: user.uid, ...ud.data() };
+      if (currentUser.role === 'admin') { window.location.href = 'admin.html'; return; }
+      document.getElementById('user-name').textContent = currentUser.displayName || 'Player';
+      await loadAll();
+      setInterval(loadAll, 60000);
+    });
+
+    // ===== TABS =====
+    document.querySelectorAll('.user-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.user-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.user-tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('utab-' + btn.dataset.utab).classList.add('active');
+        if (btn.dataset.utab === 'mypicks') renderMyPicks();
+      });
+    });
+
+    // ===== LOAD ALL DATA =====
+    async function loadAll() {
+      // Active meeting
+      let raceDate = new Date().toISOString().split('T')[0];
+      try {
+        const cfg = await getDoc(doc(db, 'config', 'activeMeeting'));
+        if (cfg.exists()) {
+          activeMeetingData = cfg.data();
+          raceDate = activeMeetingData.date || raceDate;
+          document.getElementById('meeting-venue-display').textContent = '🏟️ ' + (activeMeetingData.venue || 'Racing');
+          const d = new Date(raceDate + 'T12:00:00');
+          document.getElementById('meeting-date-display').textContent =
+            d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+          document.getElementById('user-welcome').textContent = activeMeetingData.venue || 'Racing';
+        } else {
+          document.getElementById('meeting-venue-display').textContent = '🏁 Racing';
+          document.getElementById('meeting-date-display').textContent = '';
+        }
+      } catch(e) {}
+
+      // Today's races
+      const snap = await getDocs(query(collection(db,'races'), where('date','==',raceDate)));
+      allRaces = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      allRaces.sort((a,b) => a.time.localeCompare(b.time));
+
+      // Today's picks
+      const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',currentUser.uid)));
+      myPicks = {};
+      allMyPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      allMyPicks.forEach(p => {
+        if (p.raceId && p.horseName) myPicks[p.raceId] = p;
+      });
+
+      renderRaces();
+      updateSummary();
+
+      // Re-render picks tab if visible
+      if (document.getElementById('utab-mypicks').classList.contains('active')) renderMyPicks();
+    }
+
+    // ===== RENDER RACES =====
+    function renderRaces() {
+      const container = document.getElementById('races-container');
+      if (!allRaces.length) {
+        container.innerHTML = `
+          <div class="card"><div class="card-body">
+            <div class="empty-state">
+              <div class="empty-icon">🏁</div>
+              <h3>No races loaded yet</h3>
+              <p>The admin hasn't set up today's races yet. Check back soon!</p>
+            </div>
+          </div></div>`;
+        return;
+      }
+      container.innerHTML = allRaces.map(race => renderRaceCard(race)).join('');
+    }
+
+    function renderRaceCard(race) {
+      const locked    = isRaceLocked(race);
+      const myPick    = myPicks[race.id];
+      const hasResult = !!race.result;
+      const timeUntil = getTimeUntil(race);
+      const urgent    = !locked && timeUntil < 60 * 60 * 1000;
+      const n         = (race.runners || []).length;
+      const places    = getPlaceCount(n);
+
+      // Result bar
+      let resultHtml = '';
+      if (hasResult) {
+        const picked    = myPick?.horseName;
+        const outcome   = picked ? getOutcomeLabel(race, picked) : null;
+        const pts       = picked ? calcPoints(race, picked) : 0;
+
+        const placeList = [
+          race.result.second && `2nd: ${esc(race.result.second)}`,
+          race.result.third  && `3rd: ${esc(race.result.third)}`,
+          race.result.fourth && `4th: ${esc(race.result.fourth)}`
+        ].filter(Boolean);
+
+        resultHtml = `
+          <div class="race-result-bar">
+            <span>🏆</span>
+            <span class="winner-label">${esc(race.result.winner)}</span>
+            ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
+            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +10pts</span>` : ''}
+            ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +5pts</span>` : ''}
+            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ ${esc(picked)}</span>` : ''}
+            ${pts > 0 ? `<span class="points-badge ${outcome==='place'?'place-points':''}">${pts} pts</span>` : ''}
+          </div>`;
+      }
+
+      // Place hint in header
+      const placeHint = places === 1 ? '1 place' : places === 2 ? '2 places' : '4 places';
+
+      const horsesHtml = locked
+        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>` : ' — no pick made'}</div>`
+        : `<div class="horses-grid">
+            ${(race.runners || []).map(horse => {
+              const isPicked = myPick?.horseName === horse.name;
+              const isNR = horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
+              return `
+                <div class="horse-card ${isPicked?'picked':''} ${isNR?'nr-card':''} ${locked?'locked-card':''}"
+                     onclick="${isNR ? '' : `window.pickHorse('${race.id}','${esc(horse.name).replace(/'/g,"\\'")}')` }">
+                  <div class="horse-check">✓</div>
+                  ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
+                  <div class="horse-name">${esc(horse.name)}</div>
+                  ${isNR ? `<div class="horse-nr">Non-Runner</div>` :
+                    horse.odds && horse.odds !== 'SP'
+                      ? `<div class="horse-odds">${horse.odds}</div>`
+                      : horse.form ? `<div class="horse-odds" style="font-size:0.78rem;color:var(--text-muted)">Form: ${horse.form}</div>` : '<div class="horse-odds" style="opacity:0">&nbsp;</div>'
+                  }
+                  <div class="horse-details">
+                    ${horse.jockey  ? `🧑 ${esc(horse.jockey)}<br>` : ''}
+                    ${horse.trainer ? `🎓 ${esc(horse.trainer)}` : ''}
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>`;
+
+      return `
+        <div class="race-card" id="race-${race.id}">
+          <div class="race-card-header ${locked?'locked':''}">
+            <div class="race-meta">
+              <div class="race-time ${locked?'locked-time':''}">${race.time}</div>
+              <div>
+                <div class="race-name">${esc(race.name)}</div>
+                <div class="race-info">
+                  ${esc(race.venue||'Cheltenham')}
+                  ${race.distance ? '• '+esc(race.distance) : ''}
+                  • ${n} runners • ${placeHint}
+                </div>
+              </div>
+            </div>
+            <div class="race-status-area">
+              ${locked
+                ? `<span class="lock-badge">🔒 Locked</span>
+                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)}</div>` : ''}`
+                : `<span class="lock-badge open">🟢 Open</span>
+                   <span class="countdown ${urgent?'urgent':''}">${formatTimeUntil(timeUntil)}</span>`}
+            </div>
+          </div>
+          ${horsesHtml}
+          ${resultHtml}
+        </div>`;
+    }
+
+    // ===== MY PICKS TAB =====
+    async function renderMyPicks() {
+      const container = document.getElementById('mypicks-container');
+      if (!allMyPicks.length) {
+        container.innerHTML = `
+          <div class="picks-empty">
+            <div class="empty-icon">📋</div>
+            <h3>No picks yet</h3>
+            <p>Head to Today's Races to make your picks!</p>
+          </div>`;
+        return;
+      }
+
+      // Fetch all races that have picks (may span multiple dates)
+      const raceIds = [...new Set(allMyPicks.filter(p=>p.horseName).map(p=>p.raceId))];
+      const raceDocs = {};
+      // Load each race doc individually (safe, avoids __name__ query issues)
+      await Promise.all(raceIds.map(async id => {
+        try {
+          const d = await getDoc(doc(db, 'races', id));
+          if (d.exists()) {
+            raceDocs[d.id] = { id: d.id, ...d.data() };
+            allRaceDocs[d.id] = raceDocs[d.id]; // populate cache for updateSummary
+          }
+        } catch(e) {}
+      }));
+      // Refresh summary now that we have full race data
+      updateSummary();
+
+      // Group by date
+      const byDate = {};
+      allMyPicks.filter(p => p.horseName).forEach(pick => {
+        const race = raceDocs[pick.raceId];
+        const date = race?.date || 'Unknown';
+        if (!byDate[date]) byDate[date] = [];
+        byDate[date].push({ pick, race });
+      });
+
+      const sortedDates = Object.keys(byDate).sort().reverse();
+
+      let totalPoints = 0;
+      let html = '';
+
+      for (const date of sortedDates) {
+        const items = byDate[date].sort((a,b) => (a.race?.time||'').localeCompare(b.race?.time||''));
+        let dayPoints = 0;
+        items.forEach(({ pick, race }) => {
+          if (race) dayPoints += calcPoints(race, pick.horseName);
+        });
+        totalPoints += dayPoints;
+
+        const d = new Date(date + 'T12:00:00');
+        const dateLabel = d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long' });
+        const venue = items[0]?.race?.venue || '';
+
+        html += `
+          <div class="picks-day-group">
+            <div class="picks-day-header">
+              <div>
+                <div class="picks-day-title">${dateLabel}</div>
+                ${venue ? `<div class="picks-day-venue">🏟️ ${esc(venue)}</div>` : ''}
+              </div>
+              ${dayPoints > 0 ? `<div class="picks-day-points">+${dayPoints} pts</div>` : ''}
+            </div>
+            ${items.map(({ pick, race }) => {
+              if (!race) return '';
+              const outcome = getOutcomeLabel(race, pick.horseName);
+              const pts     = calcPoints(race, pick.horseName);
+              let badgeHtml = '';
+              const raceDateTime = (() => {
+                const [h,m] = (race.time||'00:00').split(':').map(Number);
+                const nh = (h>=1&&h<=9)?h+12:h;
+                return new Date(race.date+'T'+String(nh).padStart(2,'0')+':'+String(m).padStart(2,'0')+':00Z');
+              })();
+              const raceIsPast = Date.now() > raceDateTime.getTime();
+              if (!race.result && raceIsPast)  badgeHtml = `<span class="pick-result-badge badge-pending" style="opacity:0.5">No result</span>`;
+              else if (!race.result)            badgeHtml = `<span class="pick-result-badge badge-pending">⏳ Pending</span>`;
+              else if (outcome==='win')   badgeHtml = `<span class="pick-result-badge badge-win">🏆 Won</span>`;
+              else if (outcome==='place') badgeHtml = `<span class="pick-result-badge badge-place">🥈 Placed</span>`;
+              else                        badgeHtml = `<span class="pick-result-badge badge-lose">❌ Lost</span>`;
+
+              return `
+                <div class="pick-row">
+                  <div class="pick-time">${race.time}</div>
+                  <div>
+                    <div class="pick-horse">${esc(pick.horseName)}</div>
+                    <div class="pick-race">${esc(race.name)}</div>
+                  </div>
+                  ${badgeHtml}
+                  ${pts > 0 ? `<div class="pick-points ${outcome==='place'?'place-pts':''}">+${pts}pts</div>` : ''}
+                </div>`;
+            }).join('')}
+          </div>`;
+      }
+
+      container.innerHTML = html || `<div class="picks-empty"><div class="empty-icon">📋</div><p>No picks found.</p></div>`;
+    }
+
+    // ===== PICK A HORSE =====
+    window.pickHorse = async function(raceId, horseName) {
+      const race = allRaces.find(r => r.id === raceId);
+      if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
+
+      const prev   = myPicks[raceId];
+      const pickId = prev ? prev.id : `${currentUser.uid}-${raceId}`;
+
+      if (prev?.horseName === horseName) {
+        // Deselect
+        delete myPicks[raceId];
+        allMyPicks = allMyPicks.filter(p => p.raceId !== raceId || p.id !== pickId);
+        await setDoc(doc(db,'picks',pickId), { userId:currentUser.uid, raceId, horseName:null, updatedAt:new Date().toISOString() });
+        showToast(`Deselected ${horseName}`, 'info');
+        renderRaces(); updateSummary();
+        return;
+      }
+
+      await setDoc(doc(db,'picks',pickId), {
+        userId: currentUser.uid, raceId, horseName,
+        pickedAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+
+      const newPick = { id: pickId, userId:currentUser.uid, raceId, horseName };
+      myPicks[raceId] = newPick;
+      allMyPicks = allMyPicks.filter(p => !(p.raceId === raceId)).concat([newPick]);
+      showToast(`✅ Picked: ${horseName}`, 'success');
+      renderRaces(); updateSummary();
+    };
+
+    // ===== SUMMARY =====
+    // Cache of all race docs fetched for My Picks tab — reused for total points
+    let allRaceDocs = {};
+
+    function updateSummary() {
+      const open   = allRaces.filter(r => !isRaceLocked(r)).length;
+      const picked = Object.values(myPicks).filter(p=>p.horseName).length;
+
+      // Sum points across ALL picks (all dates), not just today
+      let points = 0;
+      for (const pick of allMyPicks) {
+        if (!pick.horseName) continue;
+        // Check today's races first (fast), then allRaceDocs cache
+        const race = allRaces.find(r => r.id === pick.raceId) || allRaceDocs[pick.raceId];
+        if (race) points += calcPoints(race, pick.horseName);
+      }
+
+      document.getElementById('summary-races').textContent  = allRaces.length;
+      document.getElementById('summary-picked').textContent = picked;
+      document.getElementById('summary-points').textContent = points;
+      document.getElementById('summary-open').textContent   = open;
+    }
+
+    // ===== HELPERS =====
+    function normaliseRaceHour(h) {
+      if (h >= 1 && h <= 9) return h + 12;
+      return h;
+    }
+
+    function isRaceLocked(race) {
+      const [h,m] = (race.time||'00:00').split(':').map(Number);
+      const nh = normaliseRaceHour(h);
+      const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
+      return Date.now() >= rt.getTime() - 30 * 60 * 1000;
+    }
+
+    function getTimeUntil(race) {
+      const [h,m] = (race.time||'00:00').split(':').map(Number);
+      const nh = normaliseRaceHour(h);
+      const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
+      return Math.max(0, rt.getTime() - Date.now() - 30 * 60 * 1000);
+    }
+
+    function formatTimeUntil(ms) {
+      if (ms <= 0) return 'Locking soon…';
+      const mins = Math.floor(ms / 60000);
+      const hrs  = Math.floor(mins / 60);
+      if (hrs > 0) return `Locks in ${hrs}h ${mins % 60}m`;
+      return `Locks in ${mins}m`;
+    }
+
+    function esc(str) {
+      return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function showToast(msg, type='info') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    window.logout = async function() {
+      await signOut(auth);
+      window.location.href = 'index.html';
+    };
+  </script>
+</body>
+</html>

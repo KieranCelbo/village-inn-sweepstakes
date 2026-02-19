@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — The Village Inn Sweepstakes</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .page-header {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-mid) 100%);
+      color: white; padding: 28px; margin-bottom: 28px;
+      border-radius: var(--radius-lg); box-shadow: var(--shadow);
+    }
+    .page-header h2 { color: var(--gold-light); font-size: 1.8rem; }
+    .page-header p { color: rgba(255,255,255,0.7); margin-top: 4px; }
+    .meeting-card {
+      border: 2px solid var(--cream-dark); border-radius: 12px;
+      padding: 16px 18px; cursor: pointer; transition: all 0.2s; background: var(--white);
+    }
+    .meeting-card:hover { border-color: var(--gold); background: rgba(201,168,76,0.06); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(201,168,76,0.2); }
+    .meeting-card.meeting-active { border-color: var(--green); background: rgba(27,77,46,0.06); }
+    .meeting-venue { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+    .meeting-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+    .meeting-load-btn { font-size: 0.85rem; font-weight: 700; color: var(--gold-dark); }
+    .meeting-loaded-tag { font-size: 0.85rem; font-weight: 700; color: var(--green); }
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .user-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: var(--dark); flex-shrink: 0; }
+    .user-name { font-weight: 700; font-size: 1rem; }
+    .override-badge { font-size: 0.7rem; background: rgba(192,57,43,0.15); color: var(--red); padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+    #day-today-btn.active, #day-tomorrow-btn.active,
+    #day-today-btn.day-active, #day-tomorrow-btn.day-active { background: var(--green) !important; color: white !important; border-color: var(--green) !important; }
+
+    /* ===== ADMIN MOBILE EXTRAS ===== */
+    @media (max-width: 768px) {
+      .race-actions { flex-direction: column; gap: 8px; }
+      .race-actions .btn { width: 100%; }
+      #active-meeting-banner { border-radius: 12px; }
+
+      /* Meeting controls row */
+      .meeting-controls {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .meeting-controls > * { width: 100%; justify-content: center; }
+
+      /* Results table picks column */
+      .picks-table-wrap { max-height: 200px; overflow-y: auto; }
+
+      /* User form */
+      .user-form-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Make tabs obviously clickable everywhere */
+    .tab-btn { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.1); }
+    .tab-btn:active { opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="logo-icon">🏇</div>
+    <div><h1>The Village Inn Sweepstakes</h1><p>Admin Dashboard</p></div>
+  </div>
+  <div class="nav-user">
+    <div class="nav-user-info">
+      <div class="name" id="admin-name">Admin</div>
+      <div class="role">Administrator</div>
+    </div>
+    <button class="btn-logout" id="logout-btn">Sign Out</button>
+  </div>
+</nav>
+
+<div class="page-container">
+  <div class="page-header">
+    <h2>🎯 Admin Control Panel</h2>
+    <p>Manage users, races, results and picks</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Registered Players</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-races">—</div><div class="stat-label">Today's Races</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-picks">—</div><div class="stat-label">Total Picks Made</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-results">—</div><div class="stat-label">Results Recorded</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="users">👤 Users</button>
+    <button class="tab-btn" data-tab="races">🏁 Races</button>
+    <button class="tab-btn" data-tab="results">🏆 Results & Picks</button>
+    <button class="tab-btn" data-tab="leaderboard">📊 Leaderboard</button>
+  </div>
+
+  <!-- USERS TAB -->
+  <div id="tab-users" class="tab-panel active">
+    <div class="card">
+      <div class="card-header">
+        <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
+        <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+      </div>
+      <div class="card-body">
+        <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RACES TAB -->
+  <div id="tab-races" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div><h2>Race Meetings</h2><p>Select a meeting to load races for players</p></div>
+        <span class="badge badge-green" id="races-tab-badge" style="display:none;"></span>
+      </div>
+      <div class="card-body">
+        <div style="background:var(--cream-dark);border-radius:var(--radius);padding:20px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-weight:700;">📅 Day:</span>
+            <button class="btn btn-sm day-active" id="day-today-btn">Today</button>
+            <button class="btn btn-outline btn-sm" id="day-tomorrow-btn">Tomorrow</button>
+            <button class="btn btn-primary btn-sm" id="browse-btn">🔍 Browse Meetings</button>
+            <span style="font-size:0.85rem;color:var(--text-muted);">Picks lock 30 mins before each race.</span>
+          </div>
+        </div>
+        <div id="meeting-picker" style="display:none;margin-bottom:20px;">
+          <div style="font-weight:700;margin-bottom:12px;font-size:1rem;">🏟️ Select a Meeting to Load:</div>
+          <div id="meeting-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;"></div>
+        </div>
+        <div id="active-meeting-banner" style="display:none;background:rgba(27,77,46,0.1);border:2px solid var(--green);border-radius:10px;padding:14px 18px;margin-bottom:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <strong style="font-size:1.05rem;color:var(--green);" id="active-meeting-name">—</strong>
+            <div style="font-size:0.85rem;color:var(--text-muted);" id="active-meeting-meta">—</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" id="refresh-odds-btn">📊 Refresh Odds</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-results-btn">🏆 Refresh Results</button>
+            <button class="btn btn-outline btn-sm" id="clear-meeting-btn">✕ Clear</button>
+          </div>
+        </div>
+        <div id="races-list">
+          <div class="empty-state"><div class="empty-icon">🏁</div><h3>No meeting selected</h3><p>Click "Browse Meetings" to pick a race meeting for your players</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS TAB -->
+  <div id="tab-results" class="tab-panel">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-body" style="padding:14px 20px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:var(--text-muted);font-size:0.9rem;">🔄 Auto-fetch from Racing API:</span>
+          <button class="btn btn-secondary btn-sm" id="fetch-past-results-btn">🏆 Fetch Today's Results</button>
+          <span style="font-size:0.8rem;color:var(--text-muted);">Free API only supports today's results — use the manual result button on each race for older dates</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><h2>Results & Override Picks</h2><p>Record winners and override player selections if needed</p></div></div>
+      <div class="card-body"><div id="results-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD TAB -->
+  <div id="tab-leaderboard" class="tab-panel">
+    <div class="card">
+      <div class="card-header"><h2>🏆 Leaderboard</h2></div>
+      <div class="card-body"><div id="leaderboard-list"><div class="loading-center"><div class="loading-spinner"></div><span>Calculating…</span></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div id="user-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Add New Player</h3><button class="modal-close" id="close-user-modal-btn">×</button></div>
+    <div class="modal-body">
+      <div id="user-modal-error" class="alert alert-error" style="display:none;"></div>
+      <div class="form-group"><label class="form-label">Display Name</label><input type="text" id="user-display-name" class="form-input" placeholder="e.g. John Murphy"></div>
+      <div class="form-group"><label class="form-label">Username (for login)</label><input type="text" id="user-username" class="form-input" placeholder="e.g. john"></div>
+      <div class="form-group"><label class="form-label">Password</label><input type="password" id="user-password" class="form-input" placeholder="Min 6 characters"></div>
+      <div class="form-group"><label class="form-label">Role</label><select id="user-role" class="form-select"><option value="user">Player</option><option value="admin">Admin</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-user-btn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="save-user-btn">Save Player</button>
+    </div>
+  </div>
+</div>
+
+<!-- OVERRIDE MODAL -->
+<div id="override-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Override Pick</h3><button class="modal-close" id="close-override-btn">×</button></div>
+    <div class="modal-body">
+      <div id="override-info" style="background:var(--cream);padding:12px 16px;border-radius:8px;margin-bottom:16px;"></div>
+      <div class="form-group"><label class="form-label">Select Correct Horse</label><select id="override-horse" class="form-select"></select></div>
+      <div class="form-group"><label class="form-label">Reason</label><input type="text" id="override-reason" class="form-input" placeholder="e.g. Player requested change"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-override-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="save-override-btn">Apply Override</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div id="result-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Record Race Result</h3><button class="modal-close" id="close-result-btn">×</button></div>
+    <div class="modal-body">
+      <div id="result-race-info" style="background:var(--cream);padding:12px 16px;border-radius:8px;margin-bottom:16px;"></div>
+      <div class="form-group"><label class="form-label">Winning Horse</label><select id="result-winner" class="form-select"></select></div>
+      <div class="form-group"><label class="form-label">2nd Place</label><select id="result-second" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group"><label class="form-label">3rd Place</label><select id="result-third" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group"><label class="form-label">4th Place <small style="color:var(--text-muted)">(15+ runners only)</small></label><select id="result-fourth" class="form-select"><option value="">— Not recorded —</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-result-btn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="save-result-btn">Save Result</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+    authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+    projectId: "cheltenham-sweepstakes"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Requests go through local proxy (proxy.js) to avoid CORS issues
+  // ================================================================
+  //  PROXY URL — change this when you deploy the proxy to Railway
+  //  Local:   'http://localhost:3001'
+  //  Railway: 'https://your-proxy-name.railway.app'
+  // ================================================================
+  const PROXY_BASE     = 'http://localhost:3001';
+  const RACING_API_BASE = PROXY_BASE + '/api';
+  const RACING_HEADERS = {}; // Auth handled by proxy
+
+  let currentUser = null;
+  let allUsers = [];
+  let allRaces = [];
+  let selectedDay = 'today';
+  let activeMeeting = null;
+  let overrideContext = null;
+  let resultContext = null;
+
+  // ===== UTILS =====
+  const esc = str => String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function showToast(msg, type='info') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`; t.textContent = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+
+  // Normalise time: API may give "5:30" (could be 5am or 5pm depending on context)
+  // Evening races are always PM. If hour < 10, assume PM (add 12) for UK evening racing.
+  // This handles the case where off_time is stored without AM/PM indicator.
+  function normaliseRaceHour(h) {
+    // UK racing: if hour is between 1-9, it's almost certainly PM (13:00-21:00)
+    // Very early morning racing (before 10am) essentially doesn't exist in UK/Ireland
+    if (h >= 1 && h <= 9) return h + 12;
+    return h;
+  }
+
+  function isRaceLocked(race) {
+    const [h,m] = (race.time||'00:00').split(':').map(Number);
+    const correctedH = normaliseRaceHour(h);
+    const raceStr = race.date + 'T' + String(correctedH).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z';
+    const rt = new Date(raceStr);
+    return Date.now() >= rt.getTime() - 30 * 60 * 1000;
+  }
+
+  async function getUserProfile(uid) {
+    let s = await getDoc(doc(db,'users',uid)); if (s.exists()) return s;
+    s = await getDoc(doc(db,'Users',uid)); if (s.exists()) return s;
+    return null;
+  }
+
+  async function callAPI(endpoint) {
+    const r = await fetch(RACING_API_BASE+endpoint, {headers:RACING_HEADERS});
+    if (!r.ok) { const t=await r.text(); throw new Error(`API ${r.status}: ${t}`); }
+    return r.json();
+  }
+
+  // ===== AUTH =====
+  onAuthStateChanged(auth, async user => {
+    if (!user) { window.location.href='index.html'; return; }
+    const ud = await getUserProfile(user.uid);
+    if (!ud||!ud.exists()||ud.data().role!=='admin') { window.location.href='user.html'; return; }
+    currentUser = {uid:user.uid,...ud.data()};
+    document.getElementById('admin-name').textContent = currentUser.displayName||'Admin';
+    init();
+  });
+
+  async function init() {
+    try {
+      await Promise.all([loadUsers(), loadRaces()]);
+      loadResults(); loadLeaderboard(); updateStats();
+    } catch(err) {
+      console.error(err);
+      showToast('❌ '+err.message+' — Check Firestore Rules are published in Firebase Console', 'error');
+    }
+  }
+
+  // ===== TABS =====
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-'+name).classList.add('active');
+      btn.classList.add('active');
+      if (name==='results') loadResults();
+      if (name==='leaderboard') loadLeaderboard();
+      if (name==='races') loadRaces();
+    });
+  });
+
+  // ===== LOGOUT =====
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await signOut(auth); window.location.href='index.html';
+  });
+
+  // ===== USERS =====
+  async function loadUsers() {
+    try {
+      let snap = await getDocs(collection(db,'users'));
+      if (!snap.docs.length) snap = await getDocs(collection(db,'Users'));
+      allUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderUsers();
+    } catch(err) {
+      document.getElementById('users-list').innerHTML =
+        `<div class="alert alert-error">⚠️ Cannot load players: ${err.message}<br>
+        <small>Fix: Go to Firebase Console → Firestore → Rules tab → paste the simple rules → click Publish</small></div>`;
+    }
+  }
+
+  function renderUsers() {
+    const el = document.getElementById('users-list');
+    if (!allUsers.length) {
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">👤</div><h3>No players yet</h3><p>Click "+ Add Player" to get started</p></div>';
+      return;
+    }
+    el.innerHTML = `<div class="table-wrapper"><table>
+      <thead><tr><th>Player</th><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+      <tbody>${allUsers.map(u=>`
+        <tr>
+          <td><div class="user-info"><div class="user-avatar">${(u.displayName||'U')[0].toUpperCase()}</div>
+          <div class="user-name">${esc(u.displayName||'—')}</div></div></td>
+          <td><span class="badge badge-grey">${esc(u.username||'—')}</span></td>
+          <td><span class="badge ${u.role==='admin'?'badge-gold':'badge-green'}">${u.role}</span></td>
+          <td><div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" data-uid="${u.id}" data-name="${esc(u.displayName)}" data-action="resetpw">🔑 Reset PW</button>
+            <button class="btn btn-danger btn-sm" data-uid="${u.id}" data-name="${esc(u.displayName)}" data-action="delete">Delete</button>
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+    el.querySelectorAll('[data-action="resetpw"]').forEach(b=>b.addEventListener('click',()=>resetPW(b.dataset.uid,b.dataset.name)));
+    el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
+  }
+
+  document.getElementById('add-player-btn').addEventListener('click', () => {
+    ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('user-role').value='user';
+    document.getElementById('user-modal-error').style.display='none';
+    document.getElementById('user-modal').style.display='flex';
+  });
+  document.getElementById('close-user-modal-btn').addEventListener('click', ()=>document.getElementById('user-modal').style.display='none');
+  document.getElementById('cancel-user-btn').addEventListener('click', ()=>document.getElementById('user-modal').style.display='none');
+
+  document.getElementById('save-user-btn').addEventListener('click', async () => {
+    const name=document.getElementById('user-display-name').value.trim();
+    const username=document.getElementById('user-username').value.trim().toLowerCase();
+    const pw=document.getElementById('user-password').value;
+    const role=document.getElementById('user-role').value;
+    const errEl=document.getElementById('user-modal-error');
+    if (!name||!username||!pw){errEl.textContent='Please fill in all fields.';errEl.style.display='block';return;}
+    if (pw.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
+    try {
+      const email=username+'@cheltenham.local';
+      const cred=await createUserWithEmailAndPassword(auth,email,pw);
+      await setDoc(doc(db,'users',cred.user.uid),{displayName:name,username,role,email,createdAt:new Date().toISOString()});
+      document.getElementById('user-modal').style.display='none';
+      showToast('✅ Player added!','success');
+      await loadUsers(); updateStats();
+    } catch(err){errEl.textContent=err.message;errEl.style.display='block';}
+  });
+
+  async function resetPW(uid,name) {
+    const pw=prompt(`New password for ${name}:`);
+    if (!pw||pw.length<6){showToast('Need 6+ characters','error');return;}
+    await updateDoc(doc(db,'users',uid),{tempPassword:pw,tempPasswordNote:'Admin reset'});
+    showToast(`Password saved for ${name}. Note: Firebase requires the user to be logged in to change their own Auth password. Share the new password directly.`,'success');
+  }
+
+  async function deleteUser(uid,name) {
+    if (!confirm(`Delete "${name}"?`)) return;
+    await deleteDoc(doc(db,'users',uid));
+    showToast(`🗑️ ${name} removed`,'success');
+    await loadUsers(); updateStats();
+  }
+
+  // ===== RACES =====
+  function setDayActive(day) {
+    selectedDay = day;
+    document.getElementById('day-today-btn').classList.toggle('day-active', day==='today');
+    document.getElementById('day-today-btn').classList.toggle('btn-outline', day!=='today');
+    document.getElementById('day-tomorrow-btn').classList.toggle('day-active', day==='tomorrow');
+    document.getElementById('day-tomorrow-btn').classList.toggle('btn-outline', day==='today');
+  }
+  document.getElementById('day-today-btn').addEventListener('click', () => {
+    setDayActive('today');
+    document.getElementById('meeting-picker').style.display='none';
+  });
+  document.getElementById('day-tomorrow-btn').addEventListener('click', () => {
+    setDayActive('tomorrow');
+    document.getElementById('meeting-picker').style.display='none';
+  });
+
+  document.getElementById('browse-btn').addEventListener('click', async function() {
+    this.disabled=true; this.textContent='⏳ Loading…';
+    try {
+      const data = await callAPI(`/racecards/free?day=${selectedDay}`);
+      const all = data.racecards||[];
+      if (!all.length){showToast('No meetings found from API for '+selectedDay,'error');return;}
+      const venueMap={};
+      for (const r of all){const v=r.course||'Unknown';if(!venueMap[v])venueMap[v]=[];venueMap[v].push(r);}
+      const grid=document.getElementById('meeting-grid');
+      grid.innerHTML=Object.keys(venueMap).sort().map(venue=>{
+        const races=venueMap[venue];
+        const times=races.map(r=>r.off_time||'').filter(Boolean).sort();
+        const isActive=activeMeeting&&activeMeeting.venue===venue&&activeMeeting.day===selectedDay;
+        return `<div class="meeting-card${isActive?' meeting-active':''}" data-venue="${esc(venue)}" data-day="${selectedDay}">
+          <div class="meeting-venue">🏟️ ${esc(venue)}</div>
+          <div class="meeting-meta">${races.length} races &nbsp;•&nbsp; ${times[0]||'—'} – ${times[times.length-1]||'—'}</div>
+          ${isActive?'<div class="meeting-loaded-tag">✅ Currently Loaded</div>':'<div class="meeting-load-btn">Tap to Load for Players →</div>'}
+        </div>`;
+      }).join('');
+      grid.querySelectorAll('.meeting-card').forEach(c=>c.addEventListener('click',()=>loadMeeting(c.dataset.venue,c.dataset.day)));
+      document.getElementById('meeting-picker').style.display='block';
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{this.disabled=false;this.textContent='🔍 Browse Meetings';}
+  });
+
+  async function loadMeeting(venue,day) {
+    showToast(`⏳ Loading ${venue}…`,'info');
+    document.querySelectorAll('.meeting-card').forEach(c=>c.style.opacity='0.5');
+    const _now = new Date();
+    const _today = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0')+'-'+String(_now.getDate()).padStart(2,'0');
+    const _tmrw  = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate()+1);
+    const _tomorrowStr = _tmrw.getFullYear()+'-'+String(_tmrw.getMonth()+1).padStart(2,'0')+'-'+String(_tmrw.getDate()).padStart(2,'0');
+    const date = day==='tomorrow' ? _tomorrowStr : _today;
+    try {
+      const data=await callAPI(`/racecards/free?day=${day}`);
+      const venueRaces=(data.racecards||[]).filter(r=>(r.course||'').toLowerCase()===venue.toLowerCase());
+      if (!venueRaces.length){showToast(`No races found for ${venue}`,'error');return;}
+      const existing=await getDocs(query(collection(db,'races'),where('date','==',date)));
+      for (const d of existing.docs) await deleteDoc(doc(db,'races',d.id));
+      for (const r of venueRaces) {
+        const apiId=(r.race_id||r.id||'').toString();
+        const raceId=`${date}-${apiId.replace(/[^a-zA-Z0-9]/g,'')||Math.random().toString(36).slice(2)}`;
+        let time=r.off_time||'00:00';
+        if (time.includes('T')) time=time.split('T')[1].slice(0,5);
+        await setDoc(doc(db,'races',raceId),{
+          apiId, name:r.race_name||r.name||'Unknown Race',
+          time, date, venue:r.course||venue,
+          distance:r.distance||'', class:r.class||r.race_class||'',
+          runners:(r.runners||[]).map(h=>({
+            id:(h.horse_id||h.runner_id||h.id||'').toString(),
+            name:h.horse||h.name||'Unknown',
+            jockey:h.jockey||'',
+            trainer:h.trainer||'',
+            form:h.form||'',
+            draw:h.draw!=null?String(h.draw):'',
+            number:(h.number||h.saddle_cloth_number||h.cloth||'').toString()
+          }))
+        });
+      }
+      activeMeeting={venue,day,date};
+      await setDoc(doc(db,'config','activeMeeting'),{venue,day,date,loadedAt:new Date().toISOString()});
+
+      // Scrape odds and merge into saved races
+      showToast('📊 Fetching odds…','info');
+      try {
+        const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(venue)}&date=${date}`);
+        const oddsData = await oddsResp.json();
+        if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+          const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',date)));
+          let oddsMatched = 0;
+          for (const raceDoc of racesSnap.docs) {
+            const race = raceDoc.data();
+            const updatedRunners = (race.runners||[]).map(r => {
+              // Match by "HH:MM|HORSENAME" first (accurate), fall back to flat name match
+              // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+              if (odd) oddsMatched++;
+              return { ...r, odds: odd || 'SP' };
+            });
+            await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+          }
+          showToast(`✅ ${venueRaces.length} races loaded with odds for ${oddsMatched} horses!`,'success');
+        } else {
+          showToast(`✅ ${venueRaces.length} races loaded (odds unavailable yet — try "Refresh Odds" closer to race time)`,'success');
+        }
+      } catch(oddsErr) {
+        console.warn('Odds scrape failed:', oddsErr.message);
+        showToast(`✅ ${venueRaces.length} races loaded (could not fetch odds: ${oddsErr.message})`,'success');
+      }
+
+      await loadRaces();
+      document.getElementById('meeting-picker').style.display='none';
+      loadResults(); updateStats();
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{document.querySelectorAll('.meeting-card').forEach(c=>c.style.opacity='1');}
+  }
+
+  document.getElementById('refresh-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching…';
+    // Also refresh scraped odds
+    try {
+      const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => ({
+            ...r, odds: (oddsData.odds && (() => { const [h2,m2]=(race.time||'00:00').split(':').map(Number); const nh=(h2>=1&&h2<=9)?h2+12:h2; return oddsData.odds[String(nh).padStart(2,'0')+':'+String(m2).padStart(2,'0')+'|'+r.name.toUpperCase()]; })())
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || r.odds || 'SP'
+          }));
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+        }
+        console.log('Odds refreshed from scraper');
+      }
+    } catch(e) { console.warn('Odds refresh skipped:', e.message); }
+    try {
+      const data=await callAPI(`/results/${activeMeeting.day}/free`);
+      const vr=(data.results||[]).filter(r=>(r.course||'').toLowerCase()===activeMeeting.venue.toLowerCase());
+      let updated=0;
+      for (const result of vr) {
+        const apiId=(result.race_id||result.id||'').toString();
+        const match=allRaces.find(r=>r.apiId===apiId);
+        if (!match||match.result) continue;
+        const runners=result.runners||[];
+        const w=runners.find(r=>parseInt(r.position)===1||parseInt(r.finishing_position)===1);
+        if (!w) continue;
+        await updateDoc(doc(db,'races',match.id),{result:{
+          winner:w.horse||w.name,
+          second:(runners.find(r=>parseInt(r.position)===2)||{}).horse||'',
+          third:(runners.find(r=>parseInt(r.position)===3)||{}).horse||'',
+          recordedAt:new Date().toISOString(),recordedBy:'api-auto'
+        }});
+        updated++;
+      }
+      await loadRaces(); loadResults(); loadLeaderboard();
+      showToast(`✅ ${updated} new result(s) recorded`,'success');
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{this.disabled=false;this.textContent='🏆 Refresh Results';}
+  });
+
+  // Fetch results for any past date
+  document.getElementById('fetch-past-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting) { showToast('No active meeting loaded','error'); return; }
+    this.disabled = true; this.textContent = '⏳ Fetching…';
+    try {
+      const data = await callAPI('/results/today/free');
+      const results = data.results || [];
+      if (!results.length) { showToast('No results available yet today','error'); return; }
+
+      const vr = results.filter(r => (r.course||'').toLowerCase() === activeMeeting.venue.toLowerCase());
+      if (!vr.length) { showToast(`No results found for ${activeMeeting.venue} today yet`, 'info'); return; }
+
+      const racesSnap = await getDocs(query(collection(db,'races'), where('date','==',activeMeeting.date)));
+      let updated = 0;
+      for (const result of vr) {
+        const apiId = (result.race_id || result.id || '').toString();
+        const match = racesSnap.docs.find(d => d.data().apiId === apiId);
+        if (!match || match.data().result) continue;
+        const runners = result.runners || [];
+        const pos = n => runners.find(r => parseInt(r.position || r.finishing_position) === n);
+        const name = r => r ? (r.horse || r.name || '') : '';
+        const w = pos(1);
+        if (!w) continue;
+        await updateDoc(doc(db,'races',match.id), { result: {
+          winner: name(w), second: name(pos(2)), third: name(pos(3)), fourth: name(pos(4)),
+          recordedAt: new Date().toISOString(), recordedBy: 'manual-fetch'
+        }});
+        updated++;
+      }
+      showToast(updated ? `✅ ${updated} new result(s) saved` : 'No new results to add (all already recorded)', updated ? 'success' : 'info');
+      await loadRaces(); loadResults(); loadLeaderboard();
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = "🏆 Fetch Today's Results"; }
+  });
+
+  document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching odds…';
+    try {
+      const oddsResp = await fetch(`PROXY_BASE + '/odds'?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        let matched = 0;
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => {
+            // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+            if (odd) matched++;
+            return { ...r, odds: odd || r.odds || 'SP' };
+          });
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+        }
+        await loadRaces();
+        showToast(`✅ Odds updated for ${matched} horses!`,'success');
+      } else {
+        showToast('⚠️ No odds found — they may not be published yet. Try again closer to race time.','error');
+      }
+    } catch(err) {
+      showToast('❌ Could not fetch odds: '+err.message,'error');
+    } finally {
+      this.disabled=false; this.textContent='📊 Refresh Odds';
+    }
+  });
+
+  document.getElementById('clear-meeting-btn').addEventListener('click', ()=>{
+    activeMeeting=null;
+    document.getElementById('active-meeting-banner').style.display='none';
+    document.getElementById('races-tab-badge').style.display='none';
+    allRaces=[]; renderRaces();
+  });
+
+  async function loadRaces() {
+    if (!activeMeeting) {
+      try { const cfg=await getDoc(doc(db,'config','activeMeeting')); if (cfg.exists()) activeMeeting=cfg.data(); } catch(e){}
+    }
+    if (!activeMeeting){renderRaces();return;}
+
+    // Re-evaluate 'today' vs 'tomorrow' based on actual current date
+    // (a meeting saved as 'tomorrow' yesterday is now 'today')
+    const _n = new Date();
+    const _todayStr = _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+    const _tmrw = new Date(_n.getFullYear(), _n.getMonth(), _n.getDate()+1);
+    const _tmrwStr = _tmrw.getFullYear()+'-'+String(_tmrw.getMonth()+1).padStart(2,'0')+'-'+String(_tmrw.getDate()).padStart(2,'0');
+    if (activeMeeting.date === _todayStr)      activeMeeting.day = 'today';
+    else if (activeMeeting.date === _tmrwStr)  activeMeeting.day = 'tomorrow';
+    // Sync day buttons to match restored meeting
+    if (typeof setDayActive === 'function') setDayActive(activeMeeting.day || 'today');
+
+    const snap=await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+    allRaces=snap.docs.map(d=>({id:d.id,...d.data()}));
+    allRaces.sort((a,b)=>a.time.localeCompare(b.time));
+    document.getElementById('active-meeting-name').textContent='🏟️ '+activeMeeting.venue;
+    document.getElementById('active-meeting-meta').textContent=`${allRaces.length} races • ${activeMeeting.day==='today'?'Today':'Tomorrow'} (${activeMeeting.date})`;
+    document.getElementById('active-meeting-banner').style.display='flex';
+    const badge=document.getElementById('races-tab-badge');
+    badge.textContent=allRaces.length+' races loaded'; badge.style.display='inline-flex';
+    renderRaces();
+  }
+
+  function renderRaces() {
+    const el=document.getElementById('races-list');
+    if (!allRaces.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🏁</div><h3>No meeting selected yet</h3><p>Click "Browse Meetings" to pick a race meeting</p></div>';return;}
+    el.innerHTML=`<div class="table-wrapper"><table>
+      <thead><tr><th>Time</th><th>Race</th><th>Runners</th><th>Status</th><th>Result</th></tr></thead>
+      <tbody>${allRaces.map(r=>`<tr>
+        <td><strong>${r.time}</strong></td>
+        <td>${esc(r.name)}<br><small style="color:var(--text-muted)">${esc(r.venue||'')}</small></td>
+        <td>${(r.runners||[]).length}</td>
+        <td><span class="${isRaceLocked(r)?'lock-badge':'lock-badge open'}">${isRaceLocked(r)?'🔒 Locked':'🟢 Open'}</span></td>
+        <td>${r.result?`<span class="badge badge-gold">🏆 ${esc(r.result.winner)}</span>`:'<span style="color:var(--text-muted);font-size:0.85rem;">Pending</span>'}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  // ===== RESULTS =====
+  async function loadResults() {
+    const el = document.getElementById('results-list');
+    el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
+
+    // Load ALL picks across all dates
+    const picksSnap = await getDocs(collection(db, 'picks'));
+    const allPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.horseName && p.raceId);
+    if (!allPicks.length) {
+      el.innerHTML = "<div class='empty-state'><div class='empty-icon'>🏆</div><h3>No picks yet</h3><p>Players have not made any picks yet</p></div>";
+      return;
+    }
+
+    // Get all unique raceIds from picks, then fetch those races
+    const raceIds = [...new Set(allPicks.map(p => p.raceId))];
+    const allResultRaces = [];
+    // Fetch in batches of 30 using individual getDoc calls
+    await Promise.all(raceIds.map(async id => {
+      try {
+        const d = await getDoc(doc(db, 'races', id));
+        if (d.exists()) allResultRaces.push({ id: d.id, ...d.data() });
+      } catch(e) {}
+    }));
+
+    // Also include allRaces (active meeting) so new races with no picks yet show up
+    for (const r of allRaces) {
+      if (!allResultRaces.find(x => x.id === r.id)) allResultRaces.push(r);
+    }
+
+    // Group by date then venue
+    const byDate = {};
+    allResultRaces.forEach(race => {
+      const date = race.date || 'unknown';
+      if (!byDate[date]) byDate[date] = {};
+      const venue = race.venue || 'Unknown';
+      if (!byDate[date][venue]) byDate[date][venue] = [];
+      byDate[date][venue].push(race);
+    });
+
+    // Sort dates descending (most recent first)
+    const sortedDates = Object.keys(byDate).sort().reverse();
+
+    let html = '';
+    const allRenderedRaces = []; // track for event listeners
+
+    for (const date of sortedDates) {
+      const d = new Date(date + 'T12:00:00');
+      const dateLabel = d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+      html += `<div style="margin-bottom:28px;">
+        <div style="background:var(--green);color:white;padding:12px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--gold-light);">${dateLabel}</div>
+            <div style="font-size:0.8rem;opacity:0.7;">${Object.keys(byDate[date]).join(' • ')}</div>
+          </div>
+        </div>`;
+
+      for (const [venue, races] of Object.entries(byDate[date])) {
+        const sortedRaces = races.sort((a,b) => a.time.localeCompare(b.time));
+        for (const race of sortedRaces) {
+          allRenderedRaces.push(race);
+          const picks = allPicks.filter(p => p.raceId === race.id);
+          const hasResult = !!race.result;
+          const n = (race.runners||[]).length;
+          const places = n<=7?1:n<=14?2:4;
+
+          const outcomeLabel = (pick) => {
+            if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
+            const {winner,second,third,fourth} = race.result;
+            if (pick.horseName === winner) return '<span class="badge badge-gold">🏆 Won</span>';
+            if (places>=1&&pick.horseName===second) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
+            if (places>=3&&pick.horseName===third)  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
+            if (places>=4&&pick.horseName===fourth) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4th Placed</span>';
+            return '<span class="badge badge-red">❌ Lost</span>';
+          };
+
+          html += `<div style="border:1px solid var(--cream-dark);border-top:none;overflow:hidden;${races.indexOf(race)===races.length-1?'border-radius:0 0 12px 12px;margin-bottom:16px;':''}">
+            <div style="background:var(--cream-dark);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+              <div>
+                <strong>${race.time} — ${esc(race.name)}</strong>
+                <div style="font-size:0.82rem;color:var(--text-muted);">${picks.length} pick${picks.length!==1?'s':''} • ${n} runners</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                ${hasResult?`<span class="badge badge-gold">🏆 ${esc(race.result.winner)}</span>`:''}
+                <button class="btn btn-secondary btn-sm" data-action="open-result" data-race-id="${race.id}">${hasResult?'✏️ Edit':'🏆 Record Result'}</button>
+              </div>
+            </div>
+            ${picks.length
+              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th><th>Override</th></tr></thead><tbody>
+                  ${picks.map(pick => {
+                    const user = allUsers.find(u => u.id === pick.userId);
+                    return `<tr>
+                      <td>${esc(user?.displayName||'Unknown')}</td>
+                      <td><strong>${esc(pick.horseName)}</strong>${pick.overrideBy?' <span class="override-badge">OVERRIDE</span>':''}</td>
+                      <td>${outcomeLabel(pick)}</td>
+                      <td><button class="btn btn-outline btn-sm" data-action="open-override" data-pick-id="${pick.id}" data-race-id="${race.id}">Override</button></td>
+                    </tr>`;
+                  }).join('')}
+                </tbody></table></div>`
+              : `<div style="padding:12px 20px;color:var(--text-muted);font-size:0.85rem;">No picks for this race</div>`
+            }
+          </div>`;
+        }
+      }
+      html += '</div>';
+    }
+
+    el.innerHTML = html;
+
+    // Re-attach event listeners — openResultModal needs to search allResultRaces too
+    el.querySelectorAll('[data-action="open-result"]').forEach(b => b.addEventListener('click', () => {
+      const race = allResultRaces.find(r => r.id === b.dataset.raceId);
+      if (race) {
+        // Temporarily set resultContext and populate modal with this race's runners
+        resultContext = race;
+        document.getElementById('result-race-info').innerHTML = `<strong>${race.time} — ${esc(race.name)}</strong><div style="font-size:0.82rem;color:var(--text-muted);">${race.date} • ${race.venue||''}</div>`;
+        const opts = (race.runners||[]).map(r => `<option value="${esc(r.name)}" ${race.result?.winner===r.name?'selected':''}>${esc(r.name)}</option>`).join('');
+        const blank = '<option value="">— Select —</option>';
+        ['result-winner','result-second','result-third','result-fourth'].forEach(id => document.getElementById(id).innerHTML = blank+opts);
+        if (race.result) {
+          document.getElementById('result-winner').value = race.result.winner||'';
+          document.getElementById('result-second').value = race.result.second||'';
+          document.getElementById('result-third').value  = race.result.third||'';
+          document.getElementById('result-fourth').value = race.result.fourth||'';
+        }
+        document.getElementById('result-modal').style.display = 'flex';
+      }
+    }));
+    el.querySelectorAll('[data-action="open-override"]').forEach(b => b.addEventListener('click', () => openOverrideModal(b.dataset.pickId, b.dataset.raceId)));
+  }
+
+  // Result modal
+  async function openResultModal(raceId) {
+    const race=allRaces.find(r=>r.id===raceId); if (!race) return;
+    resultContext=race;
+    document.getElementById('result-race-info').innerHTML=`<strong>${race.time} — ${esc(race.name)}</strong>`;
+    const opts=(race.runners||[]).map(r=>`<option value="${esc(r.name)}" ${race.result?.winner===r.name?'selected':''}>${esc(r.name)}${r.draw?' (Draw: '+r.draw+')':''}</option>`).join('');
+    const blank='<option value="">— Select —</option>';
+    ['result-winner','result-second','result-third','result-fourth'].forEach(id=>document.getElementById(id).innerHTML=blank+opts);
+    if (race.result){
+      document.getElementById('result-winner').value=race.result.winner||'';
+      document.getElementById('result-second').value=race.result.second||'';
+      document.getElementById('result-third').value=race.result.third||'';
+      document.getElementById('result-fourth').value=race.result.fourth||'';
+    }
+    document.getElementById('result-modal').style.display='flex';
+  }
+  ['close-result-btn','cancel-result-btn'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('result-modal').style.display='none'));
+  document.getElementById('save-result-btn').addEventListener('click', async()=>{
+    const winner=document.getElementById('result-winner').value;
+    if (!winner){showToast('Please select a winner','error');return;}
+    await updateDoc(doc(db,'races',resultContext.id),{result:{
+      winner,
+      second:document.getElementById('result-second').value,
+      third:document.getElementById('result-third').value,
+      fourth:document.getElementById('result-fourth').value,
+      recordedAt:new Date().toISOString(),recordedBy:currentUser.uid
+    }});
+    showToast('🏆 Result saved!','success');
+    document.getElementById('result-modal').style.display='none';
+    await loadRaces(); loadResults(); loadLeaderboard();
+  });
+
+  // Override modal
+  async function openOverrideModal(pickId,raceId) {
+    const race=allRaces.find(r=>r.id===raceId);
+    const snap=await getDocs(collection(db,'picks'));
+    const pick=snap.docs.map(d=>({id:d.id,...d.data()})).find(p=>p.id===pickId);
+    if (!race||!pick) return;
+    overrideContext={pick,race};
+    const user=allUsers.find(u=>u.id===pick.userId);
+    document.getElementById('override-info').innerHTML=`<strong>Player:</strong> ${esc(user?.displayName||'Unknown')}<br><strong>Race:</strong> ${race.time} — ${esc(race.name)}<br><strong>Current Pick:</strong> ${esc(pick.horseName)}`;
+    document.getElementById('override-horse').innerHTML=(race.runners||[]).map(r=>`<option value="${esc(r.name)}" ${pick.horseName===r.name?'selected':''}>${esc(r.name)}</option>`).join('');
+    document.getElementById('override-reason').value='';
+    document.getElementById('override-modal').style.display='flex';
+  }
+  ['close-override-btn','cancel-override-btn'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('override-modal').style.display='none'));
+  document.getElementById('save-override-btn').addEventListener('click', async()=>{
+    const newHorse = document.getElementById('override-horse').value;
+    const reason   = document.getElementById('override-reason').value;
+    await updateDoc(doc(db,'picks',overrideContext.pick.id),{
+      horseName: newHorse,
+      overrideBy: currentUser.uid, overrideReason: reason,
+      overrideAt: new Date().toISOString(), originalPick: overrideContext.pick.horseName
+    });
+    // Also write the overridden horse as winner on the race doc so leaderboard scoring works
+    // Only do this if the race has no result yet
+    const race = allRaces.find(r=>r.id===overrideContext.raceId) ||
+                 (await getDoc(doc(db,'races',overrideContext.raceId))).data();
+    if (race && !race.result) {
+      await updateDoc(doc(db,'races',overrideContext.raceId),{
+        result: { winner: newHorse, second:'', third:'', fourth:'',
+                  recordedAt: new Date().toISOString(), recordedBy: 'override-'+currentUser.uid }
+      });
+    }
+    showToast('Override applied','success');
+    document.getElementById('override-modal').style.display='none';
+    await loadRaces(); loadResults(); loadLeaderboard(); updateStats();
+  });
+
+  // ===== LEADERBOARD =====
+  async function loadLeaderboard() {
+    const el=document.getElementById('leaderboard-list');
+    el.innerHTML='<div class="loading-center"><div class="loading-spinner"></div><span>Loading...</span></div>';
+
+    // Load picks, users, and races fresh — don't depend on allUsers/allRaces being loaded
+    const [picksSnap, usersSnap] = await Promise.all([
+      getDocs(collection(db,'picks')),
+      getDocs(collection(db,'users'))
+    ]);
+    const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+    const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // Also check 'Users' collection
+    try {
+      const u2 = await getDocs(collection(db,'Users'));
+      u2.docs.forEach(d=>{ if(!users.find(u=>u.id===d.id)) users.push({id:d.id,...d.data()}); });
+    } catch(e){}
+
+    // Fetch all races referenced by picks
+    const raceIds=[...new Set(picks.map(p=>p.raceId))];
+    const racesCache={};
+    allRaces.forEach(r=>{ racesCache[r.id]=r; });
+    await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+      try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
+    }));
+
+    const scores={};
+    users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+      scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
+    });
+    // Also seed from picks so users with picks but not in users collection still appear
+    picks.forEach(p=>{
+      if(!scores[p.userId]) scores[p.userId]={name:'Player '+p.userId.slice(-4),pts:0,wins:0,places:0,picks:0};
+    });
+
+    for (const p of picks){
+      scores[p.userId].picks++;
+      const race=racesCache[p.raceId];
+      if (!race||!race.result) continue;
+      const n=(race.runners||[]).length;
+      const places=n<=7?1:n<=14?2:4;
+      const {winner,second,third,fourth}=race.result;
+      if (p.horseName===winner)                    { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+      else if (places>=1&&p.horseName===second)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=3&&p.horseName===third)     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=4&&p.horseName===fourth)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+    }
+    const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+    if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
+    const medals=['🥇','🥈','🥉'];
+    el.innerHTML=sorted.map((s,i)=>`
+      <div style="display:flex;align-items:center;gap:16px;padding:16px;border-bottom:1px solid var(--cream-dark);${i===0?'background:rgba(201,168,76,0.08);border-radius:10px;':''}">
+        <span style="font-size:1.4rem;width:32px;text-align:center;">${medals[i]||(i+1)}</span>
+        <div class="user-avatar">${(s.name||'U')[0].toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:1.05rem;">${esc(s.name)}</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);">${s.wins} wins · ${s.places} places · ${s.picks} picks</div>
+        </div>
+        <div style="text-align:right;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:var(--green);">${s.pts}<div style="font-size:0.72rem;color:var(--text-muted);font-family:inherit;font-weight:400;">points</div></div>
+      </div>`).join('');
+  }
+
+  // ===== STATS =====
+  async function updateStats() {
+    document.getElementById('stat-users').textContent=allUsers.filter(u=>u.role==='user').length;
+    document.getElementById('stat-races').textContent=allRaces.length;
+    try {
+      const snap=await getDocs(collection(db,'picks'));
+      document.getElementById('stat-picks').textContent=snap.docs.filter(d=>d.data().horseName).length;
+      // Count results across all races in Firestore, not just today's
+      try {
+        const allRacesSnap = await getDocs(collection(db,'races'));
+        document.getElementById('stat-results').textContent = allRacesSnap.docs.filter(d=>d.data().result).length;
+      } catch(e) { document.getElementById('stat-results').textContent = allRaces.filter(r=>r.result).length; }
+    } catch(e){}
+  }
+</script>
+</body>
+</html>
