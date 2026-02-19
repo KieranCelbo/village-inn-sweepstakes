@@ -32,22 +32,48 @@ let bfSession = null;
 async function getBetfairToken() {
   if (bfSession && bfSession.expires > Date.now()) return bfSession.token;
 
-  console.log('Logging in to Betfair...');
+  console.log('Logging in to Betfair (certificate login)...');
+
+  // Certificate-based login — works from cloud/VPS IPs
+  // Set BETFAIR_CERT and BETFAIR_KEY env vars with the contents of client-2048.crt and client-2048.key
+  const cert = (process.env.BETFAIR_CERT || '').replace(/\\n/g, '\n');
+  const key  = (process.env.BETFAIR_KEY  || '').replace(/\\n/g, '\n');
+
+  if (!cert || !key) throw new Error('BETFAIR_CERT and BETFAIR_KEY environment variables are required');
+
   const body = `username=${encodeURIComponent(BETFAIR_USER)}&password=${encodeURIComponent(BETFAIR_PASS)}`;
 
-  const resp = await httpsPost(
-    'identitysso.betfair.com', '/api/login',
-    { 'X-Application': BETFAIR_APP_KEY, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-    body
-  );
+  const resp = await new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'identitysso-cert.betfair.com',
+      path: '/api/certlogin',
+      method: 'POST',
+      cert,
+      key,
+      headers: {
+        'X-Application':  BETFAIR_APP_KEY,
+        'Content-Type':   'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+    const req = https.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.write(body);
+    req.end();
+  });
 
   let json;
   try { json = JSON.parse(resp.body); }
-  catch(e) { throw new Error('Betfair login returned non-JSON (HTTP ' + resp.status + '): ' + resp.body.slice(0,200)); }
-  if (json.status !== 'SUCCESS') throw new Error('Betfair login failed: ' + (json.error || json.status));
+  catch(e) { throw new Error('Betfair cert login returned non-JSON (HTTP ' + resp.status + '): ' + resp.body.slice(0,200)); }
+  if (json.loginStatus !== 'SUCCESS') throw new Error('Betfair cert login failed: ' + (json.loginStatus || 'unknown'));
 
-  bfSession = { token: json.token, expires: Date.now() + 8 * 60 * 60 * 1000 };
-  console.log('Betfair session established');
+  bfSession = { token: json.sessionToken, expires: Date.now() + 8 * 60 * 60 * 1000 };
+  console.log('Betfair session established via certificate');
   return bfSession.token;
 }
 
