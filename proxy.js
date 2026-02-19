@@ -356,7 +356,7 @@ async function autoRefreshOddsAndResults() {
   } catch(e) { console.log('Auto-refresh fatal error (server continues):', e.message); }
 }
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('Village Inn Sweepstakes Proxy — port ' + PORT);
   console.log('');
