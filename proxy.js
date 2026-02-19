@@ -151,7 +151,10 @@ async function fetchOdds(venue, date) {
 async function betfairRpc(headers, method, params) {
   const body = JSON.stringify({ jsonrpc: '2.0', method: `SportsAPING/v1.0/${method}`, params, id: 1 });
   const resp = await httpsPost('api.betfair.com', '/exchange/betting/json-rpc/v1', headers, body);
-  const json = JSON.parse(resp.body);
+  console.log(`Betfair RPC ${method} — HTTP ${resp.status}, body preview: ${resp.body.slice(0,200)}`);
+  let json;
+  try { json = JSON.parse(resp.body); }
+  catch(e) { throw new Error(`Betfair RPC ${method} returned non-JSON (HTTP ${resp.status}): ${resp.body.slice(0,300)}`); }
   if (json.error) throw new Error('Betfair RPC error: ' + JSON.stringify(json.error));
   return json.result ?? {};
 }
