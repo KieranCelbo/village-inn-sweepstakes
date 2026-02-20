@@ -486,7 +486,7 @@
         <strong>📊 How points work:</strong>
         <div class="scoring-grid">
           <div class="scoring-rule"><span class="scoring-pts">10pts</span> Winner (all races)</div>
-          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: winner only &nbsp;|&nbsp; 8–14 runners: 2 places &nbsp;|&nbsp; 15+ runners: 3 places (+ optional 4th by admin)</div>
+          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 2 places &nbsp;|&nbsp; 8–14 runners: 3 places &nbsp;|&nbsp; 15+ runners: 4 places</div>
         </div>
       </div>
       <div id="races-container">
@@ -532,10 +532,16 @@
     let activeMeetingData = null;
 
     // ===== SCORING =====
+    // Strip country suffix e.g. (IRE), (FR), (USA) for name matching
+    function normHorse(name) {
+      return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase();
+    }
+    function horseMatch(a, b) { return normHorse(a) === normHorse(b); }
+
     function getPlaceCount(runnerCount) {
-      if (runnerCount <= 7)  return 1; // winner only
-      if (runnerCount <= 14) return 2; // winner + 2nd
-      return 3; // 15+ runners: winner + 2nd + 3rd (+ optional admin 4th)
+      if (runnerCount <= 7)  return 2; // winner + 2nd
+      if (runnerCount <= 14) return 3; // winner + 2nd + 3rd
+      return 4; // 15+: winner + 2nd + 3rd + 4th
     }
 
     function calcPoints(race, horseName) {
@@ -543,10 +549,10 @@
       const n = (race.runners || []).length;
       const places = getPlaceCount(n);
       const { winner, second, third, fourth } = race.result;
-      if (horseName === winner) return 10;
-      if (places >= 2 && horseName === second) return 5;
-      if (places >= 3 && horseName === third)  return 5;
-      if (fourth && horseName === fourth) return 5; // admin-entered optional 4th
+      if (horseMatch(horseName, winner)) return 10;
+      if (places >= 2 && horseMatch(horseName, second)) return 5;
+      if (places >= 3 && horseMatch(horseName, third))  return 5;
+      if (fourth && horseMatch(horseName, fourth)) return 5;
       return 0;
     }
 
@@ -555,10 +561,10 @@
       const n = (race.runners || []).length;
       const places = getPlaceCount(n);
       const { winner, second, third, fourth } = race.result;
-      if (horseName === winner)                      return 'win';
-      if (places >= 2 && horseName === second)       return 'place';
-      if (places >= 3 && horseName === third)        return 'place';
-      if (fourth && horseName === fourth)            return 'place'; // optional 4th
+      if (horseMatch(horseName, winner))                return 'win';
+      if (places >= 2 && horseMatch(horseName, second)) return 'place';
+      if (places >= 3 && horseMatch(horseName, third))  return 'place';
+      if (fourth && horseMatch(horseName, fourth))      return 'place';
       return 'lose';
     }
 
@@ -684,7 +690,7 @@
       }
 
       // Place hint in header
-      const placeHint = places === 1 ? '1 place' : places === 2 ? '2 places' : '3 places (+ optional 4th)';
+      const placeHint = places === 2 ? '2 places' : places === 3 ? '3 places' : '4 places';
 
       const horsesHtml = locked
         ? `<div class="race-locked-msg">🔒 Race locked${myPick ? ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>` : ' — no pick made'}</div>`

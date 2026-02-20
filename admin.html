@@ -131,7 +131,7 @@
             <div style="font-size:0.85rem;color:var(--text-muted);" id="active-meeting-meta">—</div>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-outline btn-sm" id="enter-odds-btn">📊 Enter Odds</button>
+            <button class="btn btn-outline btn-sm" id="refresh-odds-btn">📊 Refresh Odds</button>
             <button class="btn btn-secondary btn-sm" id="refresh-results-btn">🏆 Refresh Results</button>
             <button class="btn btn-outline btn-sm" id="clear-meeting-btn">✕ Clear</button>
           </div>
@@ -148,9 +148,9 @@
     <div class="card" style="margin-bottom:16px;">
       <div class="card-body" style="padding:14px 20px;">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <span style="font-weight:600;color:var(--text-muted);font-size:0.9rem;">🔄 Auto-refresh results every 30 mins</span>
-          <button class="btn btn-secondary btn-sm" id="fetch-past-results-btn">🏆 Fetch Results Now</button>
-          <span id="last-results-refresh" style="font-size:0.8rem;color:var(--text-muted);"></span>
+          <span style="font-weight:600;color:var(--text-muted);font-size:0.9rem;">🔄 Auto-fetch from Racing API:</span>
+          <button class="btn btn-secondary btn-sm" id="fetch-past-results-btn">🏆 Fetch Today's Results</button>
+          <span style="font-size:0.8rem;color:var(--text-muted);">Free API only supports today's results — use the manual result button on each race for older dates</span>
         </div>
       </div>
     </div>
@@ -221,28 +221,6 @@
   </div>
 </div>
 
-<!-- ODDS ENTRY MODAL -->
-<div id="odds-modal" class="modal-overlay" style="display:none;">
-  <div class="modal" style="max-width:640px;">
-    <div class="modal-header">
-      <h3>📊 Enter Odds</h3>
-      <button class="modal-close" id="close-odds-modal-btn">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="odds-race-selector" style="margin-bottom:16px;">
-        <label class="form-label">Select Race</label>
-        <select id="odds-race-select" class="form-select"></select>
-      </div>
-      <div id="odds-horses-list"></div>
-      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;">Enter decimal odds (e.g. 4.5) or fractional (e.g. 7/2). Leave blank for SP.</div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline btn-sm" id="cancel-odds-btn">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="save-odds-btn">💾 Save Odds</button>
-    </div>
-  </div>
-</div>
-
 <div id="toast-container"></div>
 
 <script type="module">
@@ -280,6 +258,12 @@
 
   // ===== UTILS =====
   const esc = str => String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // Strip country suffix e.g. (IRE), (FR), (USA) for name matching
+  function normHorse(name) {
+    return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase();
+  }
+  function horseMatch(a, b) { return normHorse(a) === normHorse(b); }
 
   function showToast(msg, type='info') {
     const c = document.getElementById('toast-container');
@@ -332,7 +316,6 @@
     try {
       await Promise.all([loadUsers(), loadRaces()]);
       loadResults(); loadLeaderboard(); updateStats();
-      startResultsAutoRefresh(); // auto-refresh results every 30 mins
     } catch(err) {
       console.error(err);
       showToast('❌ '+err.message+' — Check Firestore Rules are published in Firebase Console', 'error');
@@ -516,192 +499,165 @@
       activeMeeting={venue,day,date};
       await setDoc(doc(db,'config','activeMeeting'),{venue,day,date,loadedAt:new Date().toISOString()});
 
-      showToast(`✅ ${venueRaces.length} races loaded for ${venue}!`, 'success');
+      // Scrape odds and merge into saved races
+      showToast('📊 Fetching odds…','info');
+      try {
+        const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(venue)}&date=${date}`);
+        const oddsData = await oddsResp.json();
+        if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+          const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',date)));
+          let oddsMatched = 0;
+          for (const raceDoc of racesSnap.docs) {
+            const race = raceDoc.data();
+            const updatedRunners = (race.runners||[]).map(r => {
+              // Match by "HH:MM|HORSENAME" first (accurate), fall back to flat name match
+              // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+              if (odd) oddsMatched++;
+              return { ...r, odds: odd || 'SP' };
+            });
+            await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+          }
+          showToast(`✅ ${venueRaces.length} races loaded with odds for ${oddsMatched} horses!`,'success');
+        } else {
+          showToast(`✅ ${venueRaces.length} races loaded (odds unavailable yet — try "Refresh Odds" closer to race time)`,'success');
+        }
+      } catch(oddsErr) {
+        console.warn('Odds scrape failed:', oddsErr.message);
+        showToast(`✅ ${venueRaces.length} races loaded (could not fetch odds: ${oddsErr.message})`,'success');
+      }
+
       await loadRaces();
       document.getElementById('meeting-picker').style.display='none';
       loadResults(); updateStats();
-      startResultsAutoRefresh(); // kick off the 30-min auto-refresh
     } catch(err){showToast('❌ '+err.message,'error');}
     finally{document.querySelectorAll('.meeting-card').forEach(c=>c.style.opacity='1');}
   }
 
-  // ===== RESULTS AUTO-REFRESH (every 30 mins) =====
-  let resultsRefreshInterval = null;
-
-  function startResultsAutoRefresh() {
-    if (resultsRefreshInterval) clearInterval(resultsRefreshInterval);
-    resultsRefreshInterval = setInterval(async () => {
-      if (!activeMeeting) return;
-      console.log('⏰ Auto-refreshing results…');
-      await fetchResultsFromAPI(true); // silent = true (no toast on auto)
-    }, 30 * 60 * 1000); // 30 minutes
-  }
-
-  // Fetch results from the Racing API and save to Firestore
-  async function fetchResultsFromAPI(silent = false) {
-    if (!activeMeeting) {
-      if (!silent) showToast('No active meeting loaded', 'error');
-      return;
-    }
+  document.getElementById('refresh-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching…';
+    // Also refresh scraped odds
     try {
-      const data = await callAPI(`/results/today/free`);
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => ({
+            ...r, odds: (oddsData.odds && (() => { const [h2,m2]=(race.time||'00:00').split(':').map(Number); const nh=(h2>=1&&h2<=9)?h2+12:h2; return oddsData.odds[String(nh).padStart(2,'0')+':'+String(m2).padStart(2,'0')+'|'+r.name.toUpperCase()]; })())
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || r.odds || 'SP'
+          }));
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+        }
+        console.log('Odds refreshed from scraper');
+      }
+    } catch(e) { console.warn('Odds refresh skipped:', e.message); }
+    try {
+      const data=await callAPI(`/results/${activeMeeting.day}/free`);
+      const vr=(data.results||[]).filter(r=>(r.course||'').toLowerCase()===activeMeeting.venue.toLowerCase());
+      let updated=0;
+      for (const result of vr) {
+        const apiId=(result.race_id||result.id||'').toString();
+        const match=allRaces.find(r=>r.apiId===apiId);
+        if (!match||match.result) continue;
+        const runners=result.runners||[];
+        const w=runners.find(r=>parseInt(r.position)===1||parseInt(r.finishing_position)===1);
+        if (!w) continue;
+        await updateDoc(doc(db,'races',match.id),{result:{
+          winner:w.horse||w.name,
+          second:(runners.find(r=>parseInt(r.position)===2)||{}).horse||'',
+          third:(runners.find(r=>parseInt(r.position)===3)||{}).horse||'',
+          recordedAt:new Date().toISOString(),recordedBy:'api-auto'
+        }});
+        updated++;
+      }
+      await loadRaces(); loadResults(); loadLeaderboard();
+      showToast(`✅ ${updated} new result(s) recorded`,'success');
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{this.disabled=false;this.textContent='🏆 Refresh Results';}
+  });
+
+  // Fetch results for any past date
+  document.getElementById('fetch-past-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting) { showToast('No active meeting loaded','error'); return; }
+    this.disabled = true; this.textContent = '⏳ Fetching…';
+    try {
+      const data = await callAPI('/results/today/free');
       const results = data.results || [];
-      if (!results.length) {
-        if (!silent) showToast('No results available yet', 'info');
-        return;
-      }
+      if (!results.length) { showToast('No results available yet today','error'); return; }
 
-      const vr = results.filter(r => (r.course || '').toLowerCase() === activeMeeting.venue.toLowerCase());
-      if (!vr.length) {
-        if (!silent) showToast(`No results for ${activeMeeting.venue} yet`, 'info');
-        return;
-      }
+      const vr = results.filter(r => (r.course||'').toLowerCase() === activeMeeting.venue.toLowerCase());
+      if (!vr.length) { showToast(`No results found for ${activeMeeting.venue} today yet`, 'info'); return; }
 
-      const racesSnap = await getDocs(query(collection(db, 'races'), where('date', '==', activeMeeting.date)));
+      const racesSnap = await getDocs(query(collection(db,'races'), where('date','==',activeMeeting.date)));
       let updated = 0;
-
       for (const result of vr) {
         const apiId = (result.race_id || result.id || '').toString();
         const match = racesSnap.docs.find(d => d.data().apiId === apiId);
-        if (!match) continue;
-
+        if (!match || match.data().result) continue;
         const runners = result.runners || [];
-
-        // Helper to get horse at position
-        const atPos = n => runners.find(r => parseInt(r.position || r.finishing_position) === n);
-        const horseName = r => r ? (r.horse || r.name || '') : '';
-
-        const w = atPos(1);
+        const pos = n => runners.find(r => parseInt(r.position || r.finishing_position) === n);
+        const name = r => r ? (r.horse || r.name || '') : '';
+        const w = pos(1);
         if (!w) continue;
-
-        const raceData = match.data();
-        const numRunners = (raceData.runners || []).length;
-
-        // Place rules
-        // 1-7:   winner only
-        // 8-14:  winner + 2nd
-        // 15+:   winner + 2nd + 3rd (+ optional 4th entered manually)
-        const second = numRunners >= 8  ? horseName(atPos(2)) : '';
-        const third  = numRunners >= 15 ? horseName(atPos(3)) : '';
-        // 4th only populated if admin manually enters it — don't overwrite if already set
-        const existingResult = raceData.result || {};
-        const fourth = existingResult.fourth || ''; // preserve any manually-entered 4th
-
-        // Only update if result has changed (avoid overwriting manual entries)
-        const alreadySame =
-          existingResult.winner === horseName(w) &&
-          existingResult.second === second &&
-          existingResult.third  === third;
-
-        if (alreadySame) continue;
-
-        await updateDoc(doc(db, 'races', match.id), {
-          result: {
-            winner: horseName(w),
-            second,
-            third,
-            fourth, // preserve
-            recordedAt: new Date().toISOString(),
-            recordedBy: 'api-auto'
-          }
-        });
+        await updateDoc(doc(db,'races',match.id), { result: {
+          winner: name(w), second: name(pos(2)), third: name(pos(3)), fourth: name(pos(4)),
+          recordedAt: new Date().toISOString(), recordedBy: 'manual-fetch'
+        }});
         updated++;
       }
-
-      // Update last refresh timestamp
-      document.getElementById('last-results-refresh').textContent =
-        `Last refreshed: ${new Date().toLocaleTimeString('en-IE')}`;
-
+      showToast(updated ? `✅ ${updated} new result(s) saved` : 'No new results to add (all already recorded)', updated ? 'success' : 'info');
       await loadRaces(); loadResults(); loadLeaderboard();
-      if (!silent) showToast(updated ? `✅ ${updated} new result(s) saved` : 'No new results (already up to date)', updated ? 'success' : 'info');
-    } catch (err) {
-      console.error('Results fetch error:', err);
-      if (!silent) showToast('❌ ' + err.message, 'error');
-    }
-  }
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = "🏆 Fetch Today's Results"; }
+  });
 
-  // Manual refresh button
-  document.getElementById('refresh-results-btn').addEventListener('click', async function() {
-    if (!activeMeeting) { showToast('No active meeting', 'error'); return; }
-    this.disabled = true; this.textContent = '⏳ Fetching…';
+  document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching odds…';
     try {
-      await fetchResultsFromAPI(false);
-    } finally {
-      this.disabled = false; this.textContent = '🏆 Refresh Results';
-    }
-  });
-
-  document.getElementById('fetch-past-results-btn').addEventListener('click', async function() {
-    this.disabled = true; this.textContent = '⏳ Fetching…';
-    try {
-      await fetchResultsFromAPI(false);
-    } finally {
-      this.disabled = false; this.textContent = '🏆 Fetch Results Now';
-    }
-  });
-
-  // ===== MANUAL ODDS ENTRY =====
-  document.getElementById('enter-odds-btn').addEventListener('click', () => {
-    if (!allRaces.length) { showToast('No races loaded', 'error'); return; }
-    // Populate race selector
-    const sel = document.getElementById('odds-race-select');
-    sel.innerHTML = allRaces.map(r =>
-      `<option value="${r.id}">${r.time} — ${esc(r.name)} (${(r.runners||[]).length} runners)</option>`
-    ).join('');
-    loadOddsHorsesForRace(sel.value);
-    document.getElementById('odds-modal').style.display = 'flex';
-  });
-
-  document.getElementById('odds-race-select').addEventListener('change', function() {
-    loadOddsHorsesForRace(this.value);
-  });
-
-  function loadOddsHorsesForRace(raceId) {
-    const race = allRaces.find(r => r.id === raceId);
-    if (!race) return;
-    const container = document.getElementById('odds-horses-list');
-    container.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        ${(race.runners || []).map(h => `
-          <div style="display:flex;align-items:center;gap:10px;background:var(--cream);padding:8px 12px;border-radius:8px;">
-            <span style="flex:1;font-weight:600;font-size:0.9rem;">${esc(h.name)}</span>
-            <input type="text" class="form-input" style="width:90px;padding:6px 10px;font-size:0.9rem;"
-              data-horse="${esc(h.name)}"
-              placeholder="e.g. 4.5"
-              value="${h.odds && h.odds !== 'SP' ? h.odds : ''}">
-          </div>`).join('')}
-      </div>`;
-  }
-
-  document.getElementById('close-odds-modal-btn').addEventListener('click', () => document.getElementById('odds-modal').style.display = 'none');
-  document.getElementById('cancel-odds-btn').addEventListener('click', () => document.getElementById('odds-modal').style.display = 'none');
-
-  document.getElementById('save-odds-btn').addEventListener('click', async () => {
-    const raceId = document.getElementById('odds-race-select').value;
-    const race   = allRaces.find(r => r.id === raceId);
-    if (!race) return;
-
-    const inputs = document.querySelectorAll('#odds-horses-list input[data-horse]');
-    const updatedRunners = (race.runners || []).map(h => {
-      const input = [...inputs].find(i => i.dataset.horse === h.name);
-      let oddsVal = input ? input.value.trim() : '';
-
-      // Convert fractional to decimal if needed (e.g. "7/2" → "4.5")
-      if (oddsVal && oddsVal.includes('/')) {
-        const [num, den] = oddsVal.split('/').map(Number);
-        if (!isNaN(num) && !isNaN(den) && den !== 0) {
-          oddsVal = ((num / den) + 1).toFixed(2);
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        let matched = 0;
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => {
+            // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+            if (odd) matched++;
+            return { ...r, odds: odd || r.odds || 'SP' };
+          });
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
         }
+        await loadRaces();
+        showToast(`✅ Odds updated for ${matched} horses!`,'success');
+      } else {
+        showToast('⚠️ No odds found — they may not be published yet. Try again closer to race time.','error');
       }
-
-      return { ...h, odds: oddsVal || 'SP' };
-    });
-
-    await updateDoc(doc(db, 'races', raceId), { runners: updatedRunners });
-    allRaces = allRaces.map(r => r.id === raceId ? { ...r, runners: updatedRunners } : r);
-    showToast('✅ Odds saved!', 'success');
-    document.getElementById('odds-modal').style.display = 'none';
-    renderRaces();
+    } catch(err) {
+      showToast('❌ Could not fetch odds: '+err.message,'error');
+    } finally {
+      this.disabled=false; this.textContent='📊 Refresh Odds';
+    }
   });
 
   document.getElementById('clear-meeting-btn').addEventListener('click', ()=>{
@@ -817,15 +773,15 @@
           const picks = allPicks.filter(p => p.raceId === race.id);
           const hasResult = !!race.result;
           const n = (race.runners||[]).length;
-          const places = n<=7?1:n<=14?2:3; // 1-7: winner only, 8-14: 2 places, 15+: 3 places
+          const places = n<=7?2:n<=14?3:4; // 1-7: 2 places, 8-14: 3 places, 15+: 4 places
 
           const outcomeLabel = (pick) => {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
-            if (pick.horseName === winner) return '<span class="badge badge-gold">🏆 Won</span>';
-            if (places>=2&&pick.horseName===second) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
-            if (places>=3&&pick.horseName===third)  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
-            if (fourth&&pick.horseName===fourth)    return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed</span>';
+            if (horseMatch(pick.horseName,winner)) return '<span class="badge badge-gold">🏆 Won</span>';
+            if (places>=2&&horseMatch(pick.horseName,second)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
+            if (places>=3&&horseMatch(pick.horseName,third))  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
+            if (places>=4&&horseMatch(pick.horseName,fourth)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed</span>';
             return '<span class="badge badge-red">❌ Lost</span>';
           };
 
@@ -993,12 +949,12 @@
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
       const n=(race.runners||[]).length;
-      const places=n<=7?1:n<=14?2:3; // 1-7: winner only, 8-14: 2 places, 15+: 3 places
+      const places=n<=7?2:n<=14?3:4;
       const {winner,second,third,fourth}=race.result;
-      if (p.horseName===winner)                    { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-      else if (places>=2&&p.horseName===second)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=3&&p.horseName===third)     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (fourth&&p.horseName===fourth)       { scores[p.userId].pts+=5;  scores[p.userId].places++; } // admin-entered 4th
+      if (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+      else if (places>=2&&horseMatch(p.horseName,second)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=3&&horseMatch(p.horseName,third)) { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=4&&horseMatch(p.horseName,fourth)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
