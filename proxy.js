@@ -1,4 +1,4 @@
-// proxy.js — Village Inn Sweepstakes Proxy (Ubuntu CERT version)
+// proxy.js — Village Inn Sweepstakes Proxy (Ubuntu CERT Production Version)
 
 const http  = require('http');
 const https = require('https');
@@ -6,9 +6,9 @@ const fs    = require('fs');
 
 const PORT = process.env.PORT || 3001;
 
-// =============================
+// ================================================================
 // ENVIRONMENT VARIABLES
-// =============================
+// ================================================================
 
 const RACING_API_USER = process.env.RACING_API_USER || '';
 const RACING_API_PASS = process.env.RACING_API_PASS || '';
@@ -19,19 +19,19 @@ const BETFAIR_PASS    = process.env.BETFAIR_PASS    || '';
 const BETFAIR_APP_KEY = process.env.BETFAIR_APP_KEY || '';
 
 if (!BETFAIR_USER || !BETFAIR_PASS || !BETFAIR_APP_KEY) {
-  console.log('⚠️  WARNING: Betfair credentials missing in .env');
+  console.log('⚠️ WARNING: Betfair credentials missing in .env');
 }
 
-// =============================
-// CERT FILES (local to server)
-// =============================
+// ================================================================
+// LOAD CERT FILES (must exist in same folder)
+// ================================================================
 
 const BETFAIR_CERT = fs.readFileSync('./client-2048.crt');
 const BETFAIR_KEY  = fs.readFileSync('./client-2048.key');
 
-// =============================
+// ================================================================
 // BETFAIR SESSION CACHE
-// =============================
+// ================================================================
 
 let bfSession = null;
 
@@ -67,7 +67,8 @@ async function getBetfairToken() {
     );
   }
 
-  if (json.status !== 'SUCCESS') {
+  // 🔥 Correct check for cert login
+  if (json.loginStatus !== 'SUCCESS') {
     throw new Error('Betfair CERT login failed: ' + JSON.stringify(json));
   }
 
@@ -80,9 +81,9 @@ async function getBetfairToken() {
   return bfSession.token;
 }
 
-// =============================
-// BETFAIR RPC CALL
-// =============================
+// ================================================================
+// BETFAIR RPC
+// ================================================================
 
 async function betfairRpc(headers, method, params) {
   const body = JSON.stringify({
@@ -116,9 +117,9 @@ async function betfairRpc(headers, method, params) {
   return json.result ?? {};
 }
 
-// =============================
+// ================================================================
 // FETCH ODDS
-// =============================
+// ================================================================
 
 async function fetchOdds(venue, date) {
   const token = await getBetfairToken();
@@ -172,9 +173,9 @@ async function fetchOdds(venue, date) {
   return odds;
 }
 
-// =============================
+// ================================================================
 // HTTPS HELPERS
-// =============================
+// ================================================================
 
 function httpsPost(hostname, path, headers = {}, body = '') {
   return new Promise((resolve, reject) => {
@@ -232,16 +233,16 @@ function httpsCertPost(hostname, path, headers = {}, body = '') {
   });
 }
 
-// =============================
-// SERVER
-// =============================
+// ================================================================
+// HTTP SERVER
+// ================================================================
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
 
-  if (req.url === '/health') {
-    res.end(JSON.stringify({ status: 'ok' }));
+  if (req.url === '/' || req.url === '/health') {
+    res.end(JSON.stringify({ status: 'ok', service: 'Village Inn Proxy' }));
     return;
   }
 
@@ -249,6 +250,12 @@ const server = http.createServer(async (req, res) => {
     const params = new URLSearchParams(req.url.split('?')[1] || '');
     const venue = params.get('venue');
     const date  = params.get('date');
+
+    if (!venue || !date) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'venue and date required' }));
+      return;
+    }
 
     try {
       const data = await fetchOdds(venue, date);
