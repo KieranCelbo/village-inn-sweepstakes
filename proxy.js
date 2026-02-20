@@ -1,9 +1,14 @@
-// proxy.js — Village Inn Sweepstakes Proxy (CERT LOGIN VERSION)
+// proxy.js — Village Inn Sweepstakes Proxy (Ubuntu CERT version)
 
 const http  = require('http');
 const https = require('https');
+const fs    = require('fs');
 
 const PORT = process.env.PORT || 3001;
+
+// =============================
+// ENVIRONMENT VARIABLES
+// =============================
 
 const RACING_API_USER = process.env.RACING_API_USER || '';
 const RACING_API_PASS = process.env.RACING_API_PASS || '';
@@ -12,17 +17,28 @@ const RACING_AUTH     = 'Basic ' + Buffer.from(`${RACING_API_USER}:${RACING_API_
 const BETFAIR_USER    = process.env.BETFAIR_USER    || '';
 const BETFAIR_PASS    = process.env.BETFAIR_PASS    || '';
 const BETFAIR_APP_KEY = process.env.BETFAIR_APP_KEY || '';
-const BETFAIR_CERT    = process.env.BETFAIR_CERT    || '';
-const BETFAIR_KEY     = process.env.BETFAIR_KEY     || '';
+
+if (!BETFAIR_USER || !BETFAIR_PASS || !BETFAIR_APP_KEY) {
+  console.log('⚠️  WARNING: Betfair credentials missing in .env');
+}
+
+// =============================
+// CERT FILES (local to server)
+// =============================
+
+const BETFAIR_CERT = fs.readFileSync('./client-2048.crt');
+const BETFAIR_KEY  = fs.readFileSync('./client-2048.key');
+
+// =============================
+// BETFAIR SESSION CACHE
+// =============================
 
 let bfSession = null;
 
-// ================================================================
-// CERT LOGIN
-// ================================================================
-
 async function getBetfairToken() {
-  if (bfSession && bfSession.expires > Date.now()) return bfSession.token;
+  if (bfSession && bfSession.expires > Date.now()) {
+    return bfSession.token;
+  }
 
   console.log('Logging in to Betfair (CERT login)...');
 
@@ -46,9 +62,7 @@ async function getBetfairToken() {
     json = JSON.parse(resp.body);
   } catch (e) {
     throw new Error(
-      'Betfair CERT login returned non-JSON (HTTP ' +
-      resp.status +
-      '): ' +
+      `Betfair CERT login returned non-JSON (HTTP ${resp.status}): ` +
       resp.body.slice(0, 300)
     );
   }
@@ -66,9 +80,9 @@ async function getBetfairToken() {
   return bfSession.token;
 }
 
-// ================================================================
-// BETFAIR RPC
-// ================================================================
+// =============================
+// BETFAIR RPC CALL
+// =============================
 
 async function betfairRpc(headers, method, params) {
   const body = JSON.stringify({
@@ -102,21 +116,21 @@ async function betfairRpc(headers, method, params) {
   return json.result ?? {};
 }
 
-// ================================================================
+// =============================
 // FETCH ODDS
-// ================================================================
+// =============================
 
 async function fetchOdds(venue, date) {
   const token = await getBetfairToken();
 
-  const bfHeaders = {
+  const headers = {
     'X-Application':    BETFAIR_APP_KEY,
     'X-Authentication': token,
     'Content-Type':     'application/json',
     'Accept':           'application/json'
   };
 
-  const catalogueResp = await betfairRpc(bfHeaders, 'listMarketCatalogue', {
+  const markets = await betfairRpc(headers, 'listMarketCatalogue', {
     filter: {
       eventTypeIds: ['7'],
       marketCountries: ['GB', 'IE'],
@@ -129,34 +143,16 @@ async function fetchOdds(venue, date) {
     maxResults: '200'
   });
 
-  const allMarkets = Array.isArray(catalogueResp)
-    ? catalogueResp
-    : (catalogueResp.result || []);
-
-  const venueUpper = venue.toUpperCase();
-
-  const venueMarkets = allMarkets.filter(m => {
-    const v = (m.event?.venue || m.event?.name || '').toUpperCase();
-    return v.includes(venueUpper) || venueUpper.includes(v.split(' ')[0]);
-  });
-
-  if (!venueMarkets.length) {
-    return { byTime: {}, flat: {} };
+  if (!Array.isArray(markets) || !markets.length) {
+    return {};
   }
 
-  const bookResp = await betfairRpc(bfHeaders, 'listMarketBook', {
-    marketIds: venueMarkets.map(m => m.marketId),
-    priceProjection: { priceData: ['EX_BEST_OFFERS'] },
-    orderProjection: 'EXECUTABLE',
-    currencyCode: 'GBP'
+  const books = await betfairRpc(headers, 'listMarketBook', {
+    marketIds: markets.map(m => m.marketId),
+    priceProjection: { priceData: ['EX_BEST_OFFERS'] }
   });
 
-  const books = Array.isArray(bookResp)
-    ? bookResp
-    : (bookResp.result || []);
-
-  const oddsMap = {};
-  const oddsMapFlat = {};
+  const odds = {};
 
   for (const book of books) {
     for (const runner of (book.runners || [])) {
@@ -167,18 +163,18 @@ async function fetchOdds(venue, date) {
           ? runner.lastPriceTraded
           : runner.ex?.availableToBack?.[0]?.price;
 
-      if (price && price > 1) {
-        oddsMapFlat[runner.selectionId] = price;
+      if (price) {
+        odds[runner.selectionId] = price;
       }
     }
   }
 
-  return { byTime: oddsMap, flat: oddsMapFlat };
+  return odds;
 }
 
-// ================================================================
+// =============================
 // HTTPS HELPERS
-// ================================================================
+// =============================
 
 function httpsPost(hostname, path, headers = {}, body = '') {
   return new Promise((resolve, reject) => {
@@ -236,9 +232,9 @@ function httpsCertPost(hostname, path, headers = {}, body = '') {
   });
 }
 
-// ================================================================
+// =============================
 // SERVER
-// ================================================================
+// =============================
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -252,13 +248,13 @@ const server = http.createServer(async (req, res) => {
   if (req.url.startsWith('/odds')) {
     const params = new URLSearchParams(req.url.split('?')[1] || '');
     const venue = params.get('venue');
-    const date = params.get('date');
+    const date  = params.get('date');
 
     try {
-      const odds = await fetchOdds(venue, date);
-      res.end(JSON.stringify(odds));
+      const data = await fetchOdds(venue, date);
+      res.end(JSON.stringify(data));
     } catch (err) {
-      console.error(err);
+      console.error('Odds error:', err.message);
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err.message }));
     }
@@ -270,10 +266,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
+  console.log('');
   console.log('Village Inn Sweepstakes Proxy — CERT LOGIN');
   console.log('Port:', PORT);
-
-  if (!BETFAIR_CERT || !BETFAIR_KEY) {
-    console.log('WARNING: Certificate or key not set in environment');
-  }
+  console.log('');
 });
