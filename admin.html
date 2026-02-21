@@ -96,7 +96,10 @@
     <div class="card">
       <div class="card-header">
         <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
-        <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" id="cleanup-picks-btn">🧹 Clean Orphaned Picks</button>
+          <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+        </div>
       </div>
       <div class="card-body">
         <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
@@ -373,6 +376,24 @@
     el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
   }
 
+  document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
+    this.disabled = true; this.textContent = '⏳ Checking…';
+    try {
+      const [picksSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db,'picks')),
+        getDocs(collection(db,'users'))
+      ]);
+      const validUserIds = new Set(usersSnap.docs.map(d=>d.id));
+      const orphaned = picksSnap.docs.filter(d => !validUserIds.has(d.data().userId));
+      if (!orphaned.length) { showToast('✅ No orphaned picks found', 'success'); return; }
+      if (!confirm(`Found ${orphaned.length} picks from deleted users. Remove them?`)) return;
+      for (const d of orphaned) await deleteDoc(doc(db,'picks',d.id));
+      showToast(`🧹 Removed ${orphaned.length} orphaned picks`, 'success');
+      loadLeaderboard(); updateStats();
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = '🧹 Clean Orphaned Picks'; }
+  });
+
   document.getElementById('add-player-btn').addEventListener('click', () => {
     ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('user-role').value='user';
@@ -392,17 +413,7 @@
     if (pw.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
     try {
       const email=username+'@cheltenham.local';
-      let cred;
-      try {
-        cred=await createUserWithEmailAndPassword(auth,email,pw);
-      } catch(authErr) {
-        // If email already exists in Auth (deleted user), show clear message
-        if (authErr.code==='auth/email-already-in-use') {
-          errEl.textContent='Username already taken. Please choose a different username.';
-          errEl.style.display='block'; return;
-        }
-        throw authErr;
-      }
+      const cred=await createUserWithEmailAndPassword(auth,email,pw);
       await setDoc(doc(db,'users',cred.user.uid),{displayName:name,username,role,email,createdAt:new Date().toISOString()});
       document.getElementById('user-modal').style.display='none';
       showToast('✅ Player added!','success');
@@ -418,25 +429,17 @@
   }
 
   async function deleteUser(uid,name) {
-    if (!confirm(`Delete "${name}"? This will also remove all their picks.`)) return;
+    if (!confirm(`Delete "${name}"?\n\nThis will also remove all their picks.`)) return;
     try {
-      // Delete their picks from Firestore
+      // Delete all their picks
       const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',uid)));
       for (const d of picksSnap.docs) await deleteDoc(doc(db,'picks',d.id));
-
-      // Delete their Firestore user document
+      // Delete user doc
       await deleteDoc(doc(db,'users',uid));
-
-      // Delete from Firebase Auth via a re-auth workaround:
-      // We can't delete other users from client SDK directly.
-      // Mark account as deleted so they can't log in, and store a flag
-      // so the username can be reused.
-      await setDoc(doc(db,'deletedUsers',uid), { deletedAt: new Date().toISOString(), name });
-
       showToast(`🗑️ ${name} and their picks removed`, 'success');
-      await loadUsers(); updateStats();
+      await loadUsers(); loadLeaderboard(); updateStats();
     } catch(err) {
-      showToast('❌ Error deleting user: ' + err.message, 'error');
+      showToast('❌ Error: ' + err.message, 'error');
     }
   }
 
@@ -817,13 +820,14 @@
               </div>
             </div>
             ${picks.length
-              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th></tr></thead><tbody>
+              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th><th>Override</th></tr></thead><tbody>
                   ${picks.map(pick => {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong></td>
+                      <td><strong>${esc(pick.horseName)}</strong>${pick.overrideBy?' <span class="override-badge">OVERRIDE</span>':''}</td>
                       <td>${outcomeLabel(pick)}</td>
+                      <td><button class="btn btn-outline btn-sm" data-action="open-override" data-pick-id="${pick.id}" data-race-id="${race.id}">Override</button></td>
                     </tr>`;
                   }).join('')}
                 </tbody></table></div>`
@@ -960,7 +964,7 @@
     });
     // Also seed from picks so users with picks but not in users collection still appear
     picks.forEach(p=>{
-      if(!scores[p.userId]) scores[p.userId]={name:'Player '+p.userId.slice(-4),pts:0,wins:0,places:0,picks:0};
+      if(!scores[p.userId]) continue; // skip picks from deleted users
     });
 
     for (const p of picks){
