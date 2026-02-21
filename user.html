@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Picks — The Village Inn Sweepstakes</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231b4d2e'/><text y='.9em' font-size='75' x='12'>🏇</text></svg>">
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -767,13 +768,11 @@
       // Refresh summary now that we have full race data
       updateSummary();
 
-      // Group by date — only include picks where the race was found
+      // Group by date
       const byDate = {};
       allMyPicks.filter(p => p.horseName).forEach(pick => {
         const race = raceDocs[pick.raceId];
-        if (!race) return; // skip orphaned picks with no race doc
-        const date = race.date || null;
-        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return; // skip invalid dates
+        const date = race?.date || 'Unknown';
         if (!byDate[date]) byDate[date] = [];
         byDate[date].push({ pick, race });
       });
