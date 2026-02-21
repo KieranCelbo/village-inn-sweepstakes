@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard — The Village Inn Sweepstakes</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231b4d2e'/><text y='.9em' font-size='75' x='12'>🏇</text></svg>">
   <link rel="stylesheet" href="styles.css">
   <style>
     .page-header {
@@ -97,10 +96,7 @@
     <div class="card">
       <div class="card-header">
         <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" id="cleanup-picks-btn">🧹 Clean Orphaned Picks</button>
-          <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
-        </div>
+        <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
       </div>
       <div class="card-body">
         <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
@@ -214,9 +210,14 @@
     <div class="modal-body">
       <div id="result-race-info" style="background:var(--cream);padding:12px 16px;border-radius:8px;margin-bottom:16px;"></div>
       <div class="form-group"><label class="form-label">Winning Horse</label><select id="result-winner" class="form-select"></select></div>
-      <div class="form-group"><label class="form-label">2nd Place</label><select id="result-second" class="form-select"><option value="">— Not recorded —</option></select></div>
-      <div class="form-group"><label class="form-label">3rd Place</label><select id="result-third" class="form-select"><option value="">— Not recorded —</option></select></div>
-      <div class="form-group"><label class="form-label">4th Place <small style="color:var(--text-muted)">(15+ runners only)</small></label><select id="result-fourth" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-second-group"><label class="form-label">2nd Place</label><select id="result-second" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-third-group"><label class="form-label">3rd Place</label><select id="result-third" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-fourth-group"><label class="form-label">4th Place</label><select id="result-fourth" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-fifth-group" style="display:none;"><label class="form-label">5th Place</label><select id="result-fifth" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--cream);border-radius:8px;display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="result-extra-place" style="width:18px;height:18px;cursor:pointer;">
+        <label for="result-extra-place" style="cursor:pointer;font-size:0.9rem;">Add extra place <span style="color:var(--text-muted);font-size:0.82rem;">(admin discretion — adds one more paid place)</span></label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline btn-sm" id="cancel-result-btn">Cancel</button>
@@ -262,6 +263,17 @@
 
   // ===== UTILS =====
   const esc = str => String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // Strip country suffix e.g. (IRE),(GB),(FR) before comparing horse names
+  function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+  function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+
+  // Place rules: 1-7 = 2 paid places (W+1), 8-14 = 3 paid places (W+2), 15+ = 4 paid places (W+3)
+  // extraPlace flag allows admin to add one extra place to any race
+  function getPlaces(numRunners, extraPlace) {
+    const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
+    return extraPlace ? base + 1 : base;
+  }
 
   function showToast(msg, type='info') {
     const c = document.getElementById('toast-container');
@@ -376,24 +388,6 @@
     el.querySelectorAll('[data-action="resetpw"]').forEach(b=>b.addEventListener('click',()=>resetPW(b.dataset.uid,b.dataset.name)));
     el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
   }
-
-  document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
-    this.disabled = true; this.textContent = '⏳ Checking…';
-    try {
-      const [picksSnap, usersSnap] = await Promise.all([
-        getDocs(collection(db,'picks')),
-        getDocs(collection(db,'users'))
-      ]);
-      const validUserIds = new Set(usersSnap.docs.map(d=>d.id));
-      const orphaned = picksSnap.docs.filter(d => !validUserIds.has(d.data().userId));
-      if (!orphaned.length) { showToast('✅ No orphaned picks found', 'success'); return; }
-      if (!confirm(`Found ${orphaned.length} pick(s) from deleted users. Remove them?`)) return;
-      for (const d of orphaned) await deleteDoc(doc(db,'picks',d.id));
-      showToast(`🧹 Removed ${orphaned.length} orphaned pick(s)`, 'success');
-      loadLeaderboard(); updateStats();
-    } catch(err) { showToast('❌ ' + err.message, 'error'); }
-    finally { this.disabled = false; this.textContent = '🧹 Clean Orphaned Picks'; }
-  });
 
   document.getElementById('add-player-btn').addEventListener('click', () => {
     ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
@@ -789,15 +783,15 @@
           const picks = allPicks.filter(p => p.raceId === race.id);
           const hasResult = !!race.result;
           const n = (race.runners||[]).length;
-          const places = n<=7?1:n<=14?2:4;
+          const places = getPlaces(n, race.extraPlace);
 
           const outcomeLabel = (pick) => {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
-            if (pick.horseName === winner) return '<span class="badge badge-gold">🏆 Won</span>';
-            if (places>=1&&pick.horseName===second) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
-            if (places>=3&&pick.horseName===third)  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
-            if (places>=4&&pick.horseName===fourth) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4th Placed</span>';
+            if (horseMatch(pick.horseName,winner)) return '<span class="badge badge-gold">🏆 Won</span>';
+            if (places>=2&&horseMatch(pick.horseName,second)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
+            if (places>=3&&horseMatch(pick.horseName,third))  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
+            if (places>=4&&horseMatch(pick.horseName,fourth)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed</span>';
             return '<span class="badge badge-red">❌ Lost</span>';
           };
 
@@ -813,13 +807,14 @@
               </div>
             </div>
             ${picks.length
-              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th></tr></thead><tbody>
+              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th><th>Override</th></tr></thead><tbody>
                   ${picks.map(pick => {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong></td>
+                      <td><strong>${esc(pick.horseName)}</strong>${pick.overrideBy?' <span class="override-badge">OVERRIDE</span>':''}</td>
                       <td>${outcomeLabel(pick)}</td>
+                      <td><button class="btn btn-outline btn-sm" data-action="open-override" data-pick-id="${pick.id}" data-race-id="${race.id}">Override</button></td>
                     </tr>`;
                   }).join('')}
                 </tbody></table></div>`
@@ -857,33 +852,67 @@
 
   // Result modal
   async function openResultModal(raceId) {
-    const race=allRaces.find(r=>r.id===raceId); if (!race) return;
-    resultContext=race;
-    document.getElementById('result-race-info').innerHTML=`<strong>${race.time} — ${esc(race.name)}</strong>`;
-    const opts=(race.runners||[]).map(r=>`<option value="${esc(r.name)}" ${race.result?.winner===r.name?'selected':''}>${esc(r.name)}${r.draw?' (Draw: '+r.draw+')':''}</option>`).join('');
-    const blank='<option value="">— Select —</option>';
-    ['result-winner','result-second','result-third','result-fourth'].forEach(id=>document.getElementById(id).innerHTML=blank+opts);
-    if (race.result){
-      document.getElementById('result-winner').value=race.result.winner||'';
-      document.getElementById('result-second').value=race.result.second||'';
-      document.getElementById('result-third').value=race.result.third||'';
-      document.getElementById('result-fourth').value=race.result.fourth||'';
+    const race = allRaces.find(r=>r.id===raceId); if (!race) return;
+    resultContext = race;
+    const n = (race.runners||[]).length;
+    const basePlaces = getPlaces(n, false);
+    const extraPlace = !!race.extraPlace;
+
+    document.getElementById('result-race-info').innerHTML =
+      `<strong>${race.time} — ${esc(race.name)}</strong>
+       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;">${n} runners · normally ${basePlaces} paid places</div>`;
+
+    const opts = (race.runners||[]).map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+    const blank = '<option value="">— Select —</option>';
+    ['result-winner','result-second','result-third','result-fourth','result-fifth'].forEach(id=>{
+      document.getElementById(id).innerHTML = blank+opts;
+    });
+
+    if (race.result) {
+      document.getElementById('result-winner').value = race.result.winner||'';
+      document.getElementById('result-second').value = race.result.second||'';
+      document.getElementById('result-third').value  = race.result.third||'';
+      document.getElementById('result-fourth').value = race.result.fourth||'';
+      document.getElementById('result-fifth').value  = race.result.fifth||'';
     }
-    document.getElementById('result-modal').style.display='flex';
+
+    // Set extra place checkbox
+    document.getElementById('result-extra-place').checked = extraPlace;
+
+    // Show/hide place fields based on runner count + extra place
+    function updatePlaceFields() {
+      const extra = document.getElementById('result-extra-place').checked;
+      const totalPlaces = getPlaces(n, extra);
+      document.getElementById('result-second-group').style.display = totalPlaces >= 2 ? '' : 'none';
+      document.getElementById('result-third-group').style.display  = totalPlaces >= 3 ? '' : 'none';
+      document.getElementById('result-fourth-group').style.display = totalPlaces >= 4 ? '' : 'none';
+      document.getElementById('result-fifth-group').style.display  = totalPlaces >= 5 ? '' : 'none';
+    }
+    updatePlaceFields();
+    document.getElementById('result-extra-place').onchange = updatePlaceFields;
+
+    document.getElementById('result-modal').style.display = 'flex';
   }
+
   ['close-result-btn','cancel-result-btn'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('result-modal').style.display='none'));
-  document.getElementById('save-result-btn').addEventListener('click', async()=>{
-    const winner=document.getElementById('result-winner').value;
-    if (!winner){showToast('Please select a winner','error');return;}
-    await updateDoc(doc(db,'races',resultContext.id),{result:{
-      winner,
-      second:document.getElementById('result-second').value,
-      third:document.getElementById('result-third').value,
-      fourth:document.getElementById('result-fourth').value,
-      recordedAt:new Date().toISOString(),recordedBy:currentUser.uid
-    }});
+
+  document.getElementById('save-result-btn').addEventListener('click', async () => {
+    const winner = document.getElementById('result-winner').value;
+    if (!winner) { showToast('Please select a winner','error'); return; }
+    const extraPlace = document.getElementById('result-extra-place').checked;
+    await updateDoc(doc(db,'races',resultContext.id), {
+      extraPlace,
+      result: {
+        winner,
+        second: document.getElementById('result-second').value,
+        third:  document.getElementById('result-third').value,
+        fourth: document.getElementById('result-fourth').value,
+        fifth:  document.getElementById('result-fifth').value,
+        recordedAt: new Date().toISOString(), recordedBy: currentUser.uid
+      }
+    });
     showToast('🏆 Result saved!','success');
-    document.getElementById('result-modal').style.display='none';
+    document.getElementById('result-modal').style.display = 'none';
     await loadRaces(); loadResults(); loadLeaderboard();
   });
 
@@ -954,22 +983,19 @@
     users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
       scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
     });
-    // Also seed from picks so users with picks but not in users collection still appear
-    picks.forEach(p=>{
-      if(!scores[p.userId]) scores[p.userId]={name:'Player '+p.userId.slice(-4),pts:0,wins:0,places:0,picks:0};
-    });
 
     for (const p of picks){
+      if (!scores[p.userId]) continue; // skip deleted users
       scores[p.userId].picks++;
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
       const n=(race.runners||[]).length;
-      const places=n<=7?1:n<=14?2:4;
+      const places=getPlaces(n, race.extraPlace);
       const {winner,second,third,fourth}=race.result;
-      if (p.horseName===winner)                    { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-      else if (places>=1&&p.horseName===second)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=3&&p.horseName===third)     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=4&&p.horseName===fourth)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+      else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}

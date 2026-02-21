@@ -477,7 +477,6 @@
     <div class="user-tabs">
       <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
       <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
-      <button class="user-tab-btn" data-utab="leaderboard">🏆 Leaderboard</button>
     </div>
 
     <!-- TAB: Races -->
@@ -487,7 +486,7 @@
         <strong>📊 How points work:</strong>
         <div class="scoring-grid">
           <div class="scoring-rule"><span class="scoring-pts">10pts</span> Winner (all races)</div>
-          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 1 place &nbsp;|&nbsp; 8–14 runners: 2 places &nbsp;|&nbsp; 15+ runners: 3rd &amp; 4th also score</div>
+          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 1 place &nbsp;|&nbsp; 8–14 runners: 2 places &nbsp;|&nbsp; 15+ runners: 3 places</div>
         </div>
       </div>
       <div id="races-container">
@@ -504,13 +503,6 @@
         <div class="loading-center">
           <div class="loading-spinner"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- TAB: Leaderboard -->
-    <div class="user-tab-panel" id="utab-leaderboard">
-      <div id="leaderboard-container">
-        <div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>
       </div>
     </div>
 
@@ -540,33 +532,42 @@
     let activeMeetingData = null;
 
     // ===== SCORING =====
-    function getPlaceCount(runnerCount) {
-      if (runnerCount <= 7)  return 1;
-      if (runnerCount <= 14) return 2;
-      return 4; // 15+ runners: winner + 3 places (2nd/3rd/4th)
+    // Strip country suffix (IRE),(GB),(FR) etc before comparing
+    function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+    function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+
+    // 1-7 runners: winner + 1 place (2 total)
+    // 8-14 runners: winner + 2 places (3 total)
+    // 15+ runners: winner + 3 places (4 total)
+    // extraPlace: admin adds one extra paid place
+    function getPlaceCount(numRunners, extraPlace) {
+      const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
+      return extraPlace ? base + 1 : base;
     }
 
     function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
-      const n = (race.runners || []).length;
-      const places = getPlaceCount(n);
-      const { winner, second, third, fourth } = race.result;
-      if (horseName === winner) return 10;
-      if (places >= 1 && horseName === second) return 5;
-      if (places >= 3 && horseName === third)  return 5;
-      if (places >= 4 && horseName === fourth) return 5;  // 15+ only
+      const n = (race.runners||[]).length;
+      const places = getPlaceCount(n, race.extraPlace);
+      const { winner, second, third, fourth, fifth } = race.result;
+      if (horseMatch(horseName, winner))                return 10;
+      if (places >= 2 && horseMatch(horseName, second)) return 5;
+      if (places >= 3 && horseMatch(horseName, third))  return 5;
+      if (places >= 4 && horseMatch(horseName, fourth)) return 5;
+      if (places >= 5 && horseMatch(horseName, fifth))  return 5;
       return 0;
     }
 
     function getOutcomeLabel(race, horseName) {
       if (!race.result || !horseName) return null;
-      const n = (race.runners || []).length;
-      const places = getPlaceCount(n);
-      const { winner, second, third, fourth } = race.result;
-      if (horseName === winner)                          return 'win';
-      if (places >= 1 && horseName === second)           return 'place';
-      if (places >= 3 && horseName === third)            return 'place';
-      if (places >= 4 && horseName === fourth)           return 'place';
+      const n = (race.runners||[]).length;
+      const places = getPlaceCount(n, race.extraPlace);
+      const { winner, second, third, fourth, fifth } = race.result;
+      if (horseMatch(horseName, winner))                return 'win';
+      if (places >= 2 && horseMatch(horseName, second)) return 'place';
+      if (places >= 3 && horseMatch(horseName, third))  return 'place';
+      if (places >= 4 && horseMatch(horseName, fourth)) return 'place';
+      if (places >= 5 && horseMatch(horseName, fifth))  return 'place';
       return 'lose';
     }
 
@@ -597,7 +598,6 @@
         btn.classList.add('active');
         document.getElementById('utab-' + btn.dataset.utab).classList.add('active');
         if (btn.dataset.utab === 'mypicks') renderMyPicks();
-        if (btn.dataset.utab === 'leaderboard') renderLeaderboard();
       });
     });
 
@@ -665,7 +665,7 @@
       const timeUntil = getTimeUntil(race);
       const urgent    = !locked && timeUntil < 60 * 60 * 1000;
       const n         = (race.runners || []).length;
-      const places    = getPlaceCount(n);
+      const places    = getPlaceCount(n, race.extraPlace);
 
       // Result bar
       let resultHtml = '';
@@ -693,7 +693,8 @@
       }
 
       // Place hint in header
-      const placeHint = places === 1 ? '1 place' : places === 2 ? '2 places' : '4 places';
+      const totalPlaces = getPlaceCount(n, race.extraPlace);
+      const placeHint = (totalPlaces - 1) + ' place' + (totalPlaces - 1 !== 1 ? 's' : '') + (race.extraPlace ? ' (+extra)' : '');
 
       const horsesHtml = locked
         ? `<div class="race-locked-msg">🔒 Race locked${myPick ? ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>` : ' — no pick made'}</div>`
@@ -896,67 +897,6 @@
       document.getElementById('summary-picked').textContent = picked;
       document.getElementById('summary-points').textContent = points;
       document.getElementById('summary-open').textContent   = open;
-    }
-
-    // ===== LEADERBOARD =====
-    async function renderLeaderboard() {
-      const el = document.getElementById('leaderboard-container');
-      el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
-      try {
-        const [picksSnap, usersSnap] = await Promise.all([
-          getDocs(collection(db,'picks')),
-          getDocs(collection(db,'users'))
-        ]);
-        const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
-        const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
-
-        const raceIds = [...new Set(picks.map(p=>p.raceId))];
-        const racesCache = {};
-        allRaces.forEach(r=>{ racesCache[r.id]=r; });
-        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
-          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
-        }));
-
-        const scores = {};
-        users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
-          scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0,isMe:u.id===currentUser?.uid};
-        });
-
-        for (const p of picks) {
-          if (!scores[p.userId]) continue; // skip deleted users
-          scores[p.userId].picks++;
-          const race = racesCache[p.raceId];
-          if (!race||!race.result) continue;
-          const pts = calcPoints(race, p.horseName);
-          const outcome = getOutcomeLabel(race, p.horseName);
-          scores[p.userId].pts += pts;
-          if (outcome==='win') scores[p.userId].wins++;
-          else if (outcome==='place') scores[p.userId].places++;
-        }
-
-        const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
-        if (!sorted.length) {
-          el.innerHTML='<div class="empty-state"><div class="empty-icon">🏆</div><h3>No results yet</h3><p>Scores will appear once races finish.</p></div>';
-          return;
-        }
-
-        const medals = ['🥇','🥈','🥉'];
-        el.innerHTML = sorted.map((s,i) => `
-          <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--cream-dark);${s.isMe?'background:rgba(27,77,46,0.06);border-left:3px solid var(--green);':''}${i===0?'background:rgba(201,168,76,0.08);':''}">
-            <span style="font-size:1.4rem;width:32px;text-align:center;">${medals[i]||(i+1)}</span>
-            <div style="width:38px;height:38px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">${(s.name||'U')[0].toUpperCase()}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:1rem;">${esc(s.name)}${s.isMe?' <span style="font-size:0.75rem;color:var(--green);font-weight:600;">(you)</span>':''}</div>
-              <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">${s.pts}</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">points</div>
-            </div>
-          </div>`).join('');
-      } catch(err) {
-        el.innerHTML = `<div style="padding:20px;color:var(--red);">Could not load leaderboard: ${esc(err.message)}</div>`;
-      }
     }
 
     // ===== HELPERS =====
