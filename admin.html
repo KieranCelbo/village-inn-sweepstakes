@@ -792,10 +792,10 @@
       );
       await loadRaces(); loadResults(); loadLeaderboard();
     } catch(err) { showToast('❌ ' + err.message, 'error'); }
-    finally { this.disabled = false; this.textContent = '🏆 Fetch Today's Results'; }
+    finally { this.disabled = false; this.textContent = "🏆 Fetch Today's Results"; }
   });
 
-    document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
+  document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
     if (!activeMeeting){showToast('No active meeting','error');return;}
     this.disabled=true; this.textContent='⏳ Fetching odds…';
     try {
