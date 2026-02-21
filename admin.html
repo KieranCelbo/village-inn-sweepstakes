@@ -258,6 +258,9 @@
 
   // ===== UTILS =====
   const esc = str => String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+  function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+  function getPlaces(n) { return n<=7?2:n<=14?3:4; }
 
   function showToast(msg, type='info') {
     const c = document.getElementById('toast-container');
@@ -767,15 +770,15 @@
           const picks = allPicks.filter(p => p.raceId === race.id);
           const hasResult = !!race.result;
           const n = (race.runners||[]).length;
-          const places = n<=7?1:n<=14?2:4;
+          const places = getPlaces(n);
 
           const outcomeLabel = (pick) => {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
-            if (pick.horseName === winner) return '<span class="badge badge-gold">🏆 Won</span>';
-            if (places>=1&&pick.horseName===second) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
-            if (places>=3&&pick.horseName===third)  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
-            if (places>=4&&pick.horseName===fourth) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4th Placed</span>';
+            if (horseMatch(pick.horseName,winner)) return '<span class="badge badge-gold">🏆 Won</span>';
+            if (places>=2&&horseMatch(pick.horseName,second)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
+            if (places>=3&&horseMatch(pick.horseName,third))  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
+            if (places>=4&&horseMatch(pick.horseName,fourth)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed</span>';
             return '<span class="badge badge-red">❌ Lost</span>';
           };
 
@@ -933,19 +936,23 @@
     users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
       scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
     });
-    // Only count picks from known users — skip orphaned picks from deleted users
+    // Also seed from picks so users with picks but not in users collection still appear
+    picks.forEach(p=>{
+      if(!scores[p.userId]) return; // skip deleted users — don't create phantom entries
+    });
+
     for (const p of picks){
-      if (!scores[p.userId]) continue; // deleted user — skip
+      if(!scores[p.userId]) continue; // skip deleted users
       scores[p.userId].picks++;
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
       const n=(race.runners||[]).length;
-      const places=n<=7?2:n<=14?3:4;
+      const places=getPlaces(n);
       const {winner,second,third,fourth}=race.result;
-      if (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-      else if (places>=2&&horseMatch(p.horseName,second)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=3&&horseMatch(p.horseName,third)) { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=4&&horseMatch(p.horseName,fourth)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+      else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
