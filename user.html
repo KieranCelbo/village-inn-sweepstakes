@@ -486,7 +486,7 @@
         <strong>📊 How points work:</strong>
         <div class="scoring-grid">
           <div class="scoring-rule"><span class="scoring-pts">10pts</span> Winner (all races)</div>
-          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 2 places &nbsp;|&nbsp; 8–14 runners: 3 places &nbsp;|&nbsp; 15+ runners: 4 places</div>
+          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed — 1–7 runners: 1 place &nbsp;|&nbsp; 8–14 runners: 2 places &nbsp;|&nbsp; 15+ runners: 3rd &amp; 4th also score</div>
         </div>
       </div>
       <div id="races-container">
@@ -532,16 +532,10 @@
     let activeMeetingData = null;
 
     // ===== SCORING =====
-    // Strip country suffix e.g. (IRE), (FR), (USA) for name matching
-    function normHorse(name) {
-      return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase();
-    }
-    function horseMatch(a, b) { return normHorse(a) === normHorse(b); }
-
     function getPlaceCount(runnerCount) {
-      if (runnerCount <= 7)  return 2; // winner + 2nd
-      if (runnerCount <= 14) return 3; // winner + 2nd + 3rd
-      return 4; // 15+: winner + 2nd + 3rd + 4th
+      if (runnerCount <= 7)  return 1;
+      if (runnerCount <= 14) return 2;
+      return 4; // 15+ runners: winner + 3 places (2nd/3rd/4th)
     }
 
     function calcPoints(race, horseName) {
@@ -549,10 +543,10 @@
       const n = (race.runners || []).length;
       const places = getPlaceCount(n);
       const { winner, second, third, fourth } = race.result;
-      if (horseMatch(horseName, winner)) return 10;
-      if (places >= 2 && horseMatch(horseName, second)) return 5;
-      if (places >= 3 && horseMatch(horseName, third))  return 5;
-      if (fourth && horseMatch(horseName, fourth)) return 5;
+      if (horseName === winner) return 10;
+      if (places >= 1 && horseName === second) return 5;
+      if (places >= 3 && horseName === third)  return 5;
+      if (places >= 4 && horseName === fourth) return 5;  // 15+ only
       return 0;
     }
 
@@ -561,10 +555,10 @@
       const n = (race.runners || []).length;
       const places = getPlaceCount(n);
       const { winner, second, third, fourth } = race.result;
-      if (horseMatch(horseName, winner))                return 'win';
-      if (places >= 2 && horseMatch(horseName, second)) return 'place';
-      if (places >= 3 && horseMatch(horseName, third))  return 'place';
-      if (fourth && horseMatch(horseName, fourth))      return 'place';
+      if (horseName === winner)                          return 'win';
+      if (places >= 1 && horseName === second)           return 'place';
+      if (places >= 3 && horseName === third)            return 'place';
+      if (places >= 4 && horseName === fourth)           return 'place';
       return 'lose';
     }
 
@@ -690,7 +684,7 @@
       }
 
       // Place hint in header
-      const placeHint = places === 2 ? '2 places' : places === 3 ? '3 places' : '4 places';
+      const placeHint = places === 1 ? '1 place' : places === 2 ? '2 places' : '4 places';
 
       const horsesHtml = locked
         ? `<div class="race-locked-msg">🔒 Race locked${myPick ? ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>` : ' — no pick made'}</div>`
@@ -700,7 +694,9 @@
               const isNR = horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
               return `
                 <div class="horse-card ${isPicked?'picked':''} ${isNR?'nr-card':''} ${locked?'locked-card':''}"
-                     onclick="${isNR ? '' : `window.pickHorse('${race.id}','${esc(horse.name).replace(/'/g,"\\'")}')` }">
+                     data-race-id="${race.id}"
+                     data-horse-name="${horse.name.replace(/"/g,'&quot;')}"
+                     data-pickable="${(!isNR && !locked) ? 'true' : 'false'}">
                   <div class="horse-check">✓</div>
                   ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
                   <div class="horse-name">${esc(horse.name)}</div>
@@ -842,8 +838,17 @@
       container.innerHTML = html || `<div class="picks-empty"><div class="empty-icon">📋</div><p>No picks found.</p></div>`;
     }
 
-    // ===== PICK A HORSE =====
-    window.pickHorse = async function(raceId, horseName) {
+    // ===== PICK A HORSE — event delegation (handles apostrophes/special chars in names) =====
+    document.getElementById('races-container').addEventListener('click', async (e) => {
+      const card = e.target.closest('.horse-card');
+      if (!card) return;
+      if (card.dataset.pickable !== 'true') return;
+      const raceId   = card.dataset.raceId;
+      const horseName = card.dataset.horseName;
+      await pickHorse(raceId, horseName);
+    });
+
+    async function pickHorse(raceId, horseName) {
       const race = allRaces.find(r => r.id === raceId);
       if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
 
@@ -870,7 +875,7 @@
       allMyPicks = allMyPicks.filter(p => !(p.raceId === raceId)).concat([newPick]);
       showToast(`✅ Picked: ${horseName}`, 'success');
       renderRaces(); updateSummary();
-    };
+    }
 
     // ===== SUMMARY =====
     // Cache of all race docs fetched for My Picks tab — reused for total points
