@@ -707,10 +707,12 @@
         : `<div class="horses-grid">
             ${(race.runners || []).map(horse => {
               const isPicked = myPick?.horseName === horse.name;
-              const isNR = horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
+              const isNR = horse.nr === true || horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
               return `
                 <div class="horse-card ${isPicked?'picked':''} ${isNR?'nr-card':''} ${locked?'locked-card':''}"
-                     onclick="${isNR ? '' : `window.pickHorse('${race.id}','${esc(horse.name).replace(/'/g,"\\'")}')` }">
+                     data-race-id="${race.id}"
+                     data-horse-name="${horse.name.replace(/"/g,'&quot;')}"
+                     data-pickable="${(!isNR && !locked) ? 'true' : 'false'}">
                   <div class="horse-check">✓</div>
                   ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
                   <div class="horse-name">${esc(horse.name)}</div>
@@ -855,7 +857,14 @@
     }
 
     // ===== PICK A HORSE =====
-    window.pickHorse = async function(raceId, horseName) {
+    // Use event delegation so apostrophes/special chars in horse names never break
+    document.getElementById('races-container').addEventListener('click', async (e) => {
+      const card = e.target.closest('.horse-card');
+      if (!card || card.dataset.pickable !== 'true') return;
+      await pickHorse(card.dataset.raceId, card.dataset.horseName);
+    });
+
+    async function pickHorse(raceId, horseName) {
       const race = allRaces.find(r => r.id === raceId);
       if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
 
