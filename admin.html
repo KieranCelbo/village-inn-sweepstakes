@@ -727,37 +727,75 @@
     if (!activeMeeting) { showToast('No active meeting loaded','error'); return; }
     this.disabled = true; this.textContent = '⏳ Fetching…';
     try {
-      const data = await callAPI('/results/today/free');
+      // Try today endpoint first, fall back to /results/free
+      let data;
+      try { data = await callAPI('/results/today/free'); }
+      catch(e) { data = await callAPI('/results/free'); }
+
       const results = data.results || [];
-      if (!results.length) { showToast('No results available yet today','error'); return; }
+      if (!results.length) { showToast('No results from API yet — races may not have finished','info'); return; }
+
+      // Log what courses came back so we can debug venue matching
+      const courses = [...new Set(results.map(r=>r.course).filter(Boolean))];
+      console.log('API courses returned:', courses);
+      console.log('Active meeting venue:', activeMeeting.venue);
 
       const vr = results.filter(r => venueMatch(r.course||'', activeMeeting.venue));
-      if (!vr.length) { showToast(`No results found for ${activeMeeting.venue} today yet`, 'info'); return; }
+      if (!vr.length) {
+        showToast(`No results for "${activeMeeting.venue}" yet — API has: ${courses.slice(0,4).join(', ')}`, 'info');
+        return;
+      }
 
       const racesSnap = await getDocs(query(collection(db,'races'), where('date','==',activeMeeting.date)));
-      let updated = 0;
+      let updated = 0, skipped = 0;
+
       for (const result of vr) {
         const apiId = (result.race_id || result.id || '').toString();
         const match = racesSnap.docs.find(d => d.data().apiId === apiId);
-        if (!match || match.data().result) continue;
+        if (!match) { skipped++; continue; }
+
+        const raceData = match.data();
         const runners = result.runners || [];
-        const pos = n => runners.find(r => parseInt(r.position || r.finishing_position) === n);
-        const name = r => r ? (r.horse || r.name || '') : '';
-        const w = pos(1);
+        const atPos = n => runners.find(r => parseInt(r.position || r.finishing_position || 99) === n);
+        // Strip country suffix from horse names when saving
+        const horseName = r => r ? String(r.horse||r.name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim() : '';
+
+        const w = atPos(1);
         if (!w) continue;
-        await updateDoc(doc(db,'races',match.id), { result: {
-          winner: name(w), second: name(pos(2)), third: name(pos(3)), fourth: name(pos(4)),
-          recordedAt: new Date().toISOString(), recordedBy: 'manual-fetch'
-        }});
+
+        // Apply correct place rules based on runner count
+        const numRunners = (raceData.runners||[]).length;
+        const places = getPlaces(numRunners, raceData.extraPlace||false);
+
+        const newResult = {
+          winner: horseName(w),
+          second: places >= 2 ? horseName(atPos(2)) : '',
+          third:  places >= 3 ? horseName(atPos(3)) : '',
+          fourth: places >= 4 ? horseName(atPos(4)) : '',
+          fifth:  places >= 5 ? horseName(atPos(5)) : '',
+          recordedAt: new Date().toISOString(),
+          recordedBy: 'fetch-btn'
+        };
+
+        // Only skip if result is identical — allow updating previously fetched results
+        const prev = raceData.result || {};
+        if (prev.winner && horseMatch(prev.winner, newResult.winner)) { skipped++; continue; }
+
+        await updateDoc(doc(db,'races',match.id), { result: newResult });
         updated++;
       }
-      showToast(updated ? `✅ ${updated} new result(s) saved` : 'No new results to add (all already recorded)', updated ? 'success' : 'info');
+
+      showToast(
+        updated ? `✅ ${updated} result(s) saved${skipped?' ('+skipped+' unchanged)':''}` :
+        skipped  ? 'All results already up to date' : 'No matching races found',
+        updated ? 'success' : 'info'
+      );
       await loadRaces(); loadResults(); loadLeaderboard();
     } catch(err) { showToast('❌ ' + err.message, 'error'); }
-    finally { this.disabled = false; this.textContent = "🏆 Fetch Today's Results"; }
+    finally { this.disabled = false; this.textContent = '🏆 Fetch Today's Results'; }
   });
 
-  document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
+    document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
     if (!activeMeeting){showToast('No active meeting','error');return;}
     this.disabled=true; this.textContent='⏳ Fetching odds…';
     try {
