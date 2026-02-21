@@ -477,6 +477,7 @@
     <div class="user-tabs">
       <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
       <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
+      <button class="user-tab-btn" data-utab="leaderboard">🏆 Leaderboard</button>
     </div>
 
     <!-- TAB: Races -->
@@ -506,6 +507,13 @@
       </div>
     </div>
 
+    <!-- TAB: Leaderboard -->
+    <div class="user-tab-panel" id="utab-leaderboard">
+      <div id="leaderboard-container">
+        <div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>
+      </div>
+    </div>
+
   </div>
 
   <div id="toast-container"></div>
@@ -532,14 +540,11 @@
     let activeMeetingData = null;
 
     // ===== SCORING =====
-    // Strip country suffix (IRE),(GB),(FR) etc before comparing
     function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
     function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
 
-    // 1-7 runners: winner + 1 place (2 total)
-    // 8-14 runners: winner + 2 places (3 total)
-    // 15+ runners: winner + 3 places (4 total)
-    // extraPlace: admin adds one extra paid place
+    // 1-7 runners: winner + 1 place | 8-14: winner + 2 places | 15+: winner + 3 places
+    // extraPlace: admin adds 1 extra paid place for a specific race
     function getPlaceCount(numRunners, extraPlace) {
       const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
       return extraPlace ? base + 1 : base;
@@ -598,6 +603,7 @@
         btn.classList.add('active');
         document.getElementById('utab-' + btn.dataset.utab).classList.add('active');
         if (btn.dataset.utab === 'mypicks') renderMyPicks();
+        if (btn.dataset.utab === 'leaderboard') renderLeaderboard();
       });
     });
 
@@ -693,8 +699,8 @@
       }
 
       // Place hint in header
-      const totalPlaces = getPlaceCount(n, race.extraPlace);
-      const placeHint = (totalPlaces - 1) + ' place' + (totalPlaces - 1 !== 1 ? 's' : '') + (race.extraPlace ? ' (+extra)' : '');
+      const paidPlaces = places - 1; // places includes winner, hint shows placed positions only
+      const placeHint = paidPlaces + ' place' + (paidPlaces !== 1 ? 's' : '') + (race.extraPlace ? ' +extra' : '');
 
       const horsesHtml = locked
         ? `<div class="race-locked-msg">🔒 Race locked${myPick ? ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>` : ' — no pick made'}</div>`
@@ -777,11 +783,13 @@
       // Refresh summary now that we have full race data
       updateSummary();
 
-      // Group by date
+      // Group by date — only include picks where the race was found and has a valid date
       const byDate = {};
       allMyPicks.filter(p => p.horseName).forEach(pick => {
         const race = raceDocs[pick.raceId];
-        const date = race?.date || 'Unknown';
+        if (!race) return; // skip orphaned picks
+        const date = race.date;
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return; // skip invalid/missing dates
         if (!byDate[date]) byDate[date] = [];
         byDate[date].push({ pick, race });
       });
@@ -897,6 +905,67 @@
       document.getElementById('summary-picked').textContent = picked;
       document.getElementById('summary-points').textContent = points;
       document.getElementById('summary-open').textContent   = open;
+    }
+
+    // ===== LEADERBOARD =====
+    async function renderLeaderboard() {
+      const el = document.getElementById('leaderboard-container');
+      el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
+      try {
+        const [picksSnap, usersSnap] = await Promise.all([
+          getDocs(collection(db,'picks')),
+          getDocs(collection(db,'users'))
+        ]);
+        const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+        const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+        const raceIds = [...new Set(picks.map(p=>p.raceId))];
+        const racesCache = {};
+        allRaces.forEach(r=>{ racesCache[r.id]=r; });
+        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
+        }));
+
+        const scores = {};
+        users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+          scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0,isMe:u.id===currentUser?.uid};
+        });
+
+        for (const p of picks) {
+          if (!scores[p.userId]) continue;
+          scores[p.userId].picks++;
+          const race = racesCache[p.raceId];
+          if (!race||!race.result) continue;
+          const pts = calcPoints(race, p.horseName);
+          const outcome = getOutcomeLabel(race, p.horseName);
+          scores[p.userId].pts += pts;
+          if (outcome==='win') scores[p.userId].wins++;
+          else if (outcome==='place') scores[p.userId].places++;
+        }
+
+        const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+        if (!sorted.length) {
+          el.innerHTML='<div class="empty-state"><div class="empty-icon">🏆</div><h3>No results yet</h3><p>Scores will appear once races finish.</p></div>';
+          return;
+        }
+
+        const medals = ['🥇','🥈','🥉'];
+        el.innerHTML = sorted.map((s,i) => `
+          <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--cream-dark);${i===0?'background:rgba(201,168,76,0.08);':''}${s.isMe?'border-left:3px solid var(--green);':''}">
+            <span style="font-size:1.4rem;width:32px;text-align:center;">${medals[i]||(i+1)}</span>
+            <div style="width:38px;height:38px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">${(s.name||'U')[0].toUpperCase()}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:1rem;">${esc(s.name)}${s.isMe?' <span style="font-size:0.75rem;color:var(--green);font-weight:600;">(you)</span>':''}</div>
+              <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">${s.pts}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">points</div>
+            </div>
+          </div>`).join('');
+      } catch(err) {
+        el.innerHTML = `<div style="padding:20px;color:var(--red);">Could not load leaderboard: ${esc(err.message)}</div>`;
+      }
     }
 
     // ===== HELPERS =====
