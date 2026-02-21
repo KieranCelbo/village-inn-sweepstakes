@@ -96,10 +96,23 @@
     <div class="card">
       <div class="card-header">
         <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
-        <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" id="cleanup-picks-btn">🧹 Clean Orphaned Picks</button>
+          <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+        </div>
       </div>
       <div class="card-body">
         <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
+      </div>
+    </div>
+
+    <!-- Leaderboard on Users tab -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header">
+        <div><h2>🏆 Leaderboard</h2><p>Cumulative standings across all festival days</p></div>
+      </div>
+      <div class="card-body">
+        <div id="users-leaderboard"><div class="loading-center"><div class="loading-spinner"></div><span>Calculating…</span></div></div>
       </div>
     </div>
   </div>
@@ -155,7 +168,7 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><div><h2>Results & Override Picks</h2><p>Record winners and override player selections if needed</p></div></div>
+      <div class="card-header"><div><h2>Results & Picks</h2><p>Record race winners and view player selections</p></div></div>
       <div class="card-body"><div id="results-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div></div></div>
     </div>
   </div>
@@ -390,7 +403,82 @@
       </tbody></table></div>`;
     el.querySelectorAll('[data-action="resetpw"]').forEach(b=>b.addEventListener('click',()=>resetPW(b.dataset.uid,b.dataset.name)));
     el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
+    loadUsersTabLeaderboard();
   }
+
+  async function loadUsersTabLeaderboard() {
+    const el = document.getElementById('users-leaderboard');
+    if (!el) return;
+    try {
+      const picksSnap = await getDocs(collection(db,'picks'));
+      const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+      const raceIds = [...new Set(picks.map(p=>p.raceId))];
+      const racesCache = {};
+      allRaces.forEach(r=>{ racesCache[r.id]=r; });
+      // Fetch any races not in current allRaces (previous festival days)
+      await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+        try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
+      }));
+
+      const scores = {};
+      allUsers.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+        scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
+      });
+
+      for (const p of picks) {
+        if (!scores[p.userId]) continue;
+        scores[p.userId].picks++;
+        const race = racesCache[p.raceId];
+        if (!race||!race.result) continue;
+        const n = (race.runners||[]).length;
+        const places = getPlaces(n, race.extraPlace);
+        const {winner,second,third,fourth,fifth} = race.result;
+        if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+        else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+        else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+        else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+        else if (places>=5&&horseMatch(p.horseName,fifth))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      }
+
+      const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+      const medals = ['🥇','🥈','🥉'];
+      el.innerHTML = !sorted.length
+        ? '<div class="empty-state"><div class="empty-icon">📊</div><h3>No results yet</h3></div>'
+        : `<div class="table-wrapper"><table>
+            <thead><tr><th>Pos</th><th>Player</th><th>Wins</th><th>Places</th><th>Picks</th><th>Points</th></tr></thead>
+            <tbody>${sorted.map((s,i)=>`
+              <tr style="${i===0?'background:rgba(201,168,76,0.08);font-weight:600;':''}">
+                <td style="font-size:1.1rem;">${medals[i]||(i+1)}</td>
+                <td><div class="user-info"><div class="user-avatar" style="width:32px;height:32px;font-size:0.85rem;">${(s.name||'U')[0].toUpperCase()}</div>
+                  <span>${esc(s.name)}</span></div></td>
+                <td><span class="badge badge-gold">${s.wins}</span></td>
+                <td><span class="badge badge-green">${s.places}</span></td>
+                <td style="color:var(--text-muted)">${s.picks}</td>
+                <td><strong style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);">${s.pts}</strong></td>
+              </tr>`).join('')}
+            </tbody></table></div>`;
+    } catch(e) {
+      el.innerHTML = '<div style="padding:16px;color:var(--red);">Could not load leaderboard</div>';
+    }
+  }
+
+  document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
+    this.disabled = true; this.textContent = '⏳ Checking…';
+    try {
+      const [picksSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db,'picks')),
+        getDocs(collection(db,'users'))
+      ]);
+      const validUserIds = new Set(usersSnap.docs.map(d=>d.id));
+      const orphaned = picksSnap.docs.filter(d => !validUserIds.has(d.data().userId));
+      if (!orphaned.length) { showToast('✅ No orphaned picks found', 'success'); return; }
+      if (!confirm(`Found ${orphaned.length} pick(s) from deleted users. Remove them?`)) return;
+      for (const d of orphaned) await deleteDoc(doc(db,'picks',d.id));
+      showToast(`🧹 Removed ${orphaned.length} orphaned pick(s)`, 'success');
+      loadLeaderboard(); updateStats();
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = '🧹 Clean Orphaned Picks'; }
+  });
 
   document.getElementById('add-player-btn').addEventListener('click', () => {
     ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
@@ -427,10 +515,16 @@
   }
 
   async function deleteUser(uid,name) {
-    if (!confirm(`Delete "${name}"?`)) return;
-    await deleteDoc(doc(db,'users',uid));
-    showToast(`🗑️ ${name} removed`,'success');
-    await loadUsers(); updateStats();
+    if (!confirm(`Delete "${name}"?\n\nThis will also remove all their picks.`)) return;
+    try {
+      const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',uid)));
+      for (const d of picksSnap.docs) await deleteDoc(doc(db,'picks',d.id));
+      await deleteDoc(doc(db,'users',uid));
+      showToast(`🗑️ ${name} and their picks removed`, 'success');
+      await loadUsers(); loadLeaderboard(); updateStats();
+    } catch(err) {
+      showToast('❌ Error deleting user: ' + err.message, 'error');
+    }
   }
 
   // ===== RACES =====
@@ -492,26 +586,50 @@
       const data=await callAPI(`/racecards/free?day=${day}`);
       const venueRaces=(data.racecards||[]).filter(r=>venueMatch(r.course||'',venue));
       if (!venueRaces.length){showToast(`No races found for ${venue}`,'error');return;}
+
+      // Load existing races for this date so we can preserve any results already recorded
       const existing=await getDocs(query(collection(db,'races'),where('date','==',date)));
-      for (const d of existing.docs) await deleteDoc(doc(db,'races',d.id));
+      const existingByApiId={};
+      existing.docs.forEach(d=>{ const data=d.data(); if(data.apiId) existingByApiId[data.apiId]={id:d.id,...data}; });
+
+      // Delete races for this date that are no longer in the racecard (venue change etc)
+      const newApiIds=new Set(venueRaces.map(r=>(r.race_id||r.id||'').toString()));
+      for (const d of existing.docs) {
+        if (!newApiIds.has(d.data().apiId)) await deleteDoc(doc(db,'races',d.id));
+      }
+
       for (const r of venueRaces) {
         const apiId=(r.race_id||r.id||'').toString();
         const raceId=`${date}-${apiId.replace(/[^a-zA-Z0-9]/g,'')||Math.random().toString(36).slice(2)}`;
         let time=r.off_time||'00:00';
         if (time.includes('T')) time=time.split('T')[1].slice(0,5);
+
+        // Preserve existing result, extraPlace flag, and odds if already recorded
+        const prev=existingByApiId[apiId]||{};
+
         await setDoc(doc(db,'races',raceId),{
           apiId, name:r.race_name||r.name||'Unknown Race',
           time, date, venue: String(r.course||venue).replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim(),
           distance:r.distance||'', class:r.class||r.race_class||'',
-          runners:(r.runners||[]).map(h=>({
-            id:(h.horse_id||h.runner_id||h.id||'').toString(),
-            name:h.horse||h.name||'Unknown',
-            jockey:h.jockey||'',
-            trainer:h.trainer||'',
-            form:h.form||'',
-            draw:h.draw!=null?String(h.draw):'',
-            number:(h.number||h.saddle_cloth_number||h.cloth||'').toString()
-          }))
+          // Preserve previously recorded result and admin flags
+          ...(prev.result    ? { result: prev.result }       : {}),
+          ...(prev.extraPlace? { extraPlace: prev.extraPlace }: {}),
+          runners:(r.runners||[]).map(h=>{
+            // Preserve any odds already entered for this horse
+            const prevRunner=(prev.runners||[]).find(pr=>pr.name===h.horse||pr.name===h.name);
+            return {
+              id:(h.horse_id||h.runner_id||h.id||'').toString(),
+              name:h.horse||h.name||'Unknown',
+              jockey:h.jockey||'',
+              trainer:h.trainer||'',
+              form:h.form||'',
+              draw:h.draw!=null?String(h.draw):'',
+              number:(h.number||h.saddle_cloth_number||h.cloth||'').toString(),
+              ...(prevRunner?.odds ? { odds: prevRunner.odds } : {}),
+              ...(prevRunner?.nr   ? { nr: prevRunner.nr }     : {})
+            };
+          })
+        });
         });
       }
       activeMeeting={venue,day,date};
@@ -815,14 +933,13 @@
               </div>
             </div>
             ${picks.length
-              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th><th>Override</th></tr></thead><tbody>
+              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th></tr></thead><tbody>
                   ${picks.map(pick => {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong>${pick.overrideBy?' <span class="override-badge">OVERRIDE</span>':''}</td>
+                      <td><strong>${esc(pick.horseName)}</strong></td>
                       <td>${outcomeLabel(pick)}</td>
-                      <td><button class="btn btn-outline btn-sm" data-action="open-override" data-pick-id="${pick.id}" data-race-id="${race.id}">Override</button></td>
                     </tr>`;
                   }).join('')}
                 </tbody></table></div>`
@@ -855,7 +972,7 @@
         document.getElementById('result-modal').style.display = 'flex';
       }
     }));
-    el.querySelectorAll('[data-action="open-override"]').forEach(b => b.addEventListener('click', () => openOverrideModal(b.dataset.pickId, b.dataset.raceId)));
+    // override removed
   }
 
   // Result modal
@@ -999,11 +1116,12 @@
       if (!race||!race.result) continue;
       const n=(race.runners||[]).length;
       const places=getPlaces(n, race.extraPlace);
-      const {winner,second,third,fourth}=race.result;
+      const {winner,second,third,fourth,fifth}=race.result;
       if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
       else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
       else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
       else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=5&&horseMatch(p.horseName,fifth))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
