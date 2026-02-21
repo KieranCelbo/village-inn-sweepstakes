@@ -477,6 +477,7 @@
     <div class="user-tabs">
       <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
       <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
+      <button class="user-tab-btn" data-utab="leaderboard">🏆 Leaderboard</button>
     </div>
 
     <!-- TAB: Races -->
@@ -503,6 +504,13 @@
         <div class="loading-center">
           <div class="loading-spinner"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB: Leaderboard -->
+    <div class="user-tab-panel" id="utab-leaderboard">
+      <div id="leaderboard-container">
+        <div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>
       </div>
     </div>
 
@@ -589,6 +597,7 @@
         btn.classList.add('active');
         document.getElementById('utab-' + btn.dataset.utab).classList.add('active');
         if (btn.dataset.utab === 'mypicks') renderMyPicks();
+        if (btn.dataset.utab === 'leaderboard') renderLeaderboard();
       });
     });
 
@@ -694,9 +703,7 @@
               const isNR = horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
               return `
                 <div class="horse-card ${isPicked?'picked':''} ${isNR?'nr-card':''} ${locked?'locked-card':''}"
-                     data-race-id="${race.id}"
-                     data-horse-name="${horse.name.replace(/"/g,'&quot;')}"
-                     data-pickable="${(!isNR && !locked) ? 'true' : 'false'}">
+                     onclick="${isNR ? '' : `window.pickHorse('${race.id}','${esc(horse.name).replace(/'/g,"\\'")}')` }">
                   <div class="horse-check">✓</div>
                   ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
                   <div class="horse-name">${esc(horse.name)}</div>
@@ -838,17 +845,8 @@
       container.innerHTML = html || `<div class="picks-empty"><div class="empty-icon">📋</div><p>No picks found.</p></div>`;
     }
 
-    // ===== PICK A HORSE — event delegation (handles apostrophes/special chars in names) =====
-    document.getElementById('races-container').addEventListener('click', async (e) => {
-      const card = e.target.closest('.horse-card');
-      if (!card) return;
-      if (card.dataset.pickable !== 'true') return;
-      const raceId   = card.dataset.raceId;
-      const horseName = card.dataset.horseName;
-      await pickHorse(raceId, horseName);
-    });
-
-    async function pickHorse(raceId, horseName) {
+    // ===== PICK A HORSE =====
+    window.pickHorse = async function(raceId, horseName) {
       const race = allRaces.find(r => r.id === raceId);
       if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
 
@@ -875,7 +873,7 @@
       allMyPicks = allMyPicks.filter(p => !(p.raceId === raceId)).concat([newPick]);
       showToast(`✅ Picked: ${horseName}`, 'success');
       renderRaces(); updateSummary();
-    }
+    };
 
     // ===== SUMMARY =====
     // Cache of all race docs fetched for My Picks tab — reused for total points
@@ -898,6 +896,71 @@
       document.getElementById('summary-picked').textContent = picked;
       document.getElementById('summary-points').textContent = points;
       document.getElementById('summary-open').textContent   = open;
+    }
+
+    // ===== LEADERBOARD =====
+    async function renderLeaderboard() {
+      const el = document.getElementById('leaderboard-container');
+      el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
+      try {
+        const [picksSnap, usersSnap] = await Promise.all([
+          getDocs(collection(db,'picks')),
+          getDocs(collection(db,'users'))
+        ]);
+        const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+        const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+        const raceIds = [...new Set(picks.map(p=>p.raceId))];
+        const racesCache = {};
+        allRaces.forEach(r=>{ racesCache[r.id]=r; });
+        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
+        }));
+
+        const scores = {};
+        users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+          scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0,isMe:u.id===currentUser?.uid};
+        });
+        picks.forEach(p=>{ if(!scores[p.userId]) scores[p.userId]={name:'Player',pts:0,wins:0,places:0,picks:0,isMe:false}; });
+
+        for (const p of picks) {
+          if (!scores[p.userId]) continue;
+          scores[p.userId].picks++;
+          const race = racesCache[p.raceId];
+          if (!race||!race.result) continue;
+          const pts = calcPoints(race, p.horseName);
+          const outcome = getOutcomeLabel(race, p.horseName);
+          scores[p.userId].pts += pts;
+          if (outcome==='win') scores[p.userId].wins++;
+          else if (outcome==='place') scores[p.userId].places++;
+        }
+
+        const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+        if (!sorted.length) {
+          el.innerHTML='<div class="empty-state"><div class="empty-icon">🏆</div><h3>No results yet</h3><p>Scores will appear once races have finished.</p></div>';
+          return;
+        }
+
+        const medals = ['🥇','🥈','🥉'];
+        el.innerHTML = `
+          <div style="padding:8px 0 16px;">
+            ${sorted.map((s,i) => `
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--cream-dark);border-radius:${i===0?'12px 12px':'0'} 0 0;${s.isMe?'background:rgba(27,77,46,0.06);border-left:3px solid var(--green);':''}${i===0?'background:rgba(201,168,76,0.1);':''}">
+                <span style="font-size:1.5rem;width:36px;text-align:center;">${medals[i]||(i+1)}</span>
+                <div style="width:38px;height:38px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">${(s.name||'U')[0].toUpperCase()}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:700;font-size:1rem;">${esc(s.name)}${s.isMe?' <span style="font-size:0.75rem;color:var(--green);font-weight:600;">(you)</span>':''}</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">${s.pts}</div>
+                  <div style="font-size:0.72rem;color:var(--text-muted);">points</div>
+                </div>
+              </div>`).join('')}
+          </div>`;
+      } catch(err) {
+        el.innerHTML = `<div class="alert alert-error">Could not load leaderboard: ${esc(err.message)}</div>`;
+      }
     }
 
     // ===== HELPERS =====
