@@ -577,7 +577,7 @@
     const date = day==='tomorrow' ? _tomorrowStr : _today;
     try {
       const data=await callAPI(`/racecards/free?day=${day}`);
-      const venueRaces=(data.racecards||[]).filter(r=>(r.course||'').toLowerCase()===venue.toLowerCase());
+      const venueRaces=(data.racecards||[]).filter(r=>((r.course || '').toLowerCase().includes(activeMeeting.venue.toLowerCase()));
       if (!venueRaces.length){showToast(`No races found for ${venue}`,'error');return;}
       const existing=await getDocs(query(collection(db,'races'),where('date','==',date)));
       for (const d of existing.docs) await deleteDoc(doc(db,'races',d.id));
@@ -669,7 +669,7 @@
     } catch(e) { console.warn('Odds refresh skipped:', e.message); }
     try {
       const data=await callAPI(`/results/${activeMeeting.day}/free`);
-      const vr=(data.results||[]).filter(r=>(r.course||'').toLowerCase()===activeMeeting.venue.toLowerCase());
+      const vr=(data.results||[]).filter(r=>(r.course || '').toLowerCase().includes(activeMeeting.venue.toLowerCase());
       let updated=0;
       for (const result of vr) {
         const apiId=(result.race_id||result.id||'').toString();
@@ -701,7 +701,7 @@
       const results = data.results || [];
       if (!results.length) { showToast('No results available yet today','error'); return; }
 
-      const vr = results.filter(r => (r.course||'').toLowerCase() === activeMeeting.venue.toLowerCase());
+      const vr = results.filter(r => (r.course || '').toLowerCase().includes(activeMeeting.venue.toLowerCase());
       if (!vr.length) { showToast(`No results found for ${activeMeeting.venue} today yet`, 'info'); return; }
 
       const racesSnap = await getDocs(query(collection(db,'races'), where('date','==',activeMeeting.date)));
