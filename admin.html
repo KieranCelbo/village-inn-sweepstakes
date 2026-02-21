@@ -96,10 +96,7 @@
     <div class="card">
       <div class="card-header">
         <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" id="cleanup-picks-btn">🧹 Clean Orphaned Picks</button>
-          <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
-        </div>
+        <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
       </div>
       <div class="card-body">
         <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
@@ -376,24 +373,6 @@
     el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
   }
 
-  document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
-    this.disabled = true; this.textContent = '⏳ Checking…';
-    try {
-      const [picksSnap, usersSnap] = await Promise.all([
-        getDocs(collection(db,'picks')),
-        getDocs(collection(db,'users'))
-      ]);
-      const validUserIds = new Set(usersSnap.docs.map(d=>d.id));
-      const orphaned = picksSnap.docs.filter(d => !validUserIds.has(d.data().userId));
-      if (!orphaned.length) { showToast('✅ No orphaned picks found', 'success'); return; }
-      if (!confirm(`Found ${orphaned.length} picks from deleted users. Remove them?`)) return;
-      for (const d of orphaned) await deleteDoc(doc(db,'picks',d.id));
-      showToast(`🧹 Removed ${orphaned.length} orphaned picks`, 'success');
-      loadLeaderboard(); updateStats();
-    } catch(err) { showToast('❌ ' + err.message, 'error'); }
-    finally { this.disabled = false; this.textContent = '🧹 Clean Orphaned Picks'; }
-  });
-
   document.getElementById('add-player-btn').addEventListener('click', () => {
     ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('user-role').value='user';
@@ -429,18 +408,10 @@
   }
 
   async function deleteUser(uid,name) {
-    if (!confirm(`Delete "${name}"?\n\nThis will also remove all their picks.`)) return;
-    try {
-      // Delete all their picks
-      const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',uid)));
-      for (const d of picksSnap.docs) await deleteDoc(doc(db,'picks',d.id));
-      // Delete user doc
-      await deleteDoc(doc(db,'users',uid));
-      showToast(`🗑️ ${name} and their picks removed`, 'success');
-      await loadUsers(); loadLeaderboard(); updateStats();
-    } catch(err) {
-      showToast('❌ Error: ' + err.message, 'error');
-    }
+    if (!confirm(`Delete "${name}"?`)) return;
+    await deleteDoc(doc(db,'users',uid));
+    showToast(`🗑️ ${name} removed`,'success');
+    await loadUsers(); updateStats();
   }
 
   // ===== RACES =====
@@ -962,22 +933,19 @@
     users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
       scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
     });
-    // Also seed from picks so users with picks but not in users collection still appear
-    picks.forEach(p=>{
-      if(!scores[p.userId]) continue; // skip picks from deleted users
-    });
-
+    // Only count picks from known users — skip orphaned picks from deleted users
     for (const p of picks){
+      if (!scores[p.userId]) continue; // deleted user — skip
       scores[p.userId].picks++;
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
       const n=(race.runners||[]).length;
-      const places=n<=7?1:n<=14?2:4;
+      const places=n<=7?2:n<=14?3:4;
       const {winner,second,third,fourth}=race.result;
-      if (p.horseName===winner)                    { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-      else if (places>=1&&p.horseName===second)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=3&&p.horseName===third)     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=4&&p.horseName===fourth)    { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      if (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
+      else if (places>=2&&horseMatch(p.horseName,second)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=3&&horseMatch(p.horseName,third)) { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      else if (places>=4&&horseMatch(p.horseName,fourth)){ scores[p.userId].pts+=5;  scores[p.userId].places++; }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
