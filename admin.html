@@ -630,7 +630,6 @@
             };
           })
         });
-        });
       }
       activeMeeting={venue,day,date};
       await setDoc(doc(db,'config','activeMeeting'),{venue,day,date,loadedAt:new Date().toISOString()});
