@@ -321,25 +321,49 @@ const firebaseConfig = {
     return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
   }
 
-  // Calculate points for a pick using odds-based scoring
-  function calcPoints(race, horseName) {
-    if (!race.result || !horseName) return 0;
-    const places = getRacePlaces(race);
-    const { winner, second, third, fourth, fifth } = race.result;
-    const runner = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-    const od = parseOdds(runner?.odds);
-    const ewDenom = getEwDenom(race);
-    const STAKE = 10;
+  // Calculate points for a pick using true real-world each-way returns
+function calcPoints(race, horseName) {
+  if (!race.result || !horseName) return 0;
 
-    const PLACE_STAKE = STAKE / 2; // Each-way: 10pt stake = 5pt win + 5pt place
-    if (horseMatch(horseName, winner))                return Math.round((od + 1) * STAKE);
-    if (places >= 2 && horseMatch(horseName, second)) return Math.round((od / ewDenom + 1) * PLACE_STAKE);
-    if (places >= 3 && horseMatch(horseName, third))  return Math.round((od / ewDenom + 1) * PLACE_STAKE);
-    if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((od / ewDenom + 1) * PLACE_STAKE);
-    if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((od / ewDenom + 1) * PLACE_STAKE);
+  const places = getRacePlaces(race);
+  const { winner, second, third, fourth, fifth } = race.result;
 
-    return 0;
+  const runner = (race.runners || []).find(r =>
+    horseMatch(r.name, horseName)
+  );
+
+  if (!runner) return 0;
+
+  const od = parseOdds(runner.odds);       // e.g. 10 for 10/1
+  const ewDenom = getEwDenom(race);       // 4 = 1/4, 5 = 1/5
+
+  const TOTAL_STAKE = 10;
+  const WIN_STAKE = TOTAL_STAKE / 2;     // 5
+  const PLACE_STAKE = TOTAL_STAKE / 2;   // 5
+
+  // ===== WINNER =====
+  // Win part pays full odds
+  // Place part also pays at fraction
+  if (horseMatch(horseName, winner)) {
+    const winReturn = (od + 1) * WIN_STAKE;
+    const placeReturn = ((od / ewDenom) + 1) * PLACE_STAKE;
+    return winReturn + placeReturn;
   }
+
+  // ===== PLACED (NOT WINNER) =====
+  const placed =
+    (places >= 2 && horseMatch(horseName, second)) ||
+    (places >= 3 && horseMatch(horseName, third)) ||
+    (places >= 4 && horseMatch(horseName, fourth)) ||
+    (places >= 5 && horseMatch(horseName, fifth));
+
+  if (placed) {
+    return ((od / ewDenom) + 1) * PLACE_STAKE;
+  }
+
+  // ===== LOST =====
+  return 0;
+}
 
   function showToast(msg, type='info') {
     const c = document.getElementById('toast-container');
