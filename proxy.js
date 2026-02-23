@@ -1,11 +1,11 @@
 // proxy.js — Village Inn Sweepstakes Proxy
 // Racing API only — odds entered manually by admin
-
+require('dotenv').config();
 const http  = require('http');
 const https = require('https');
 
 const PORT = process.env.PORT || 3001;
-
+require('dotenv').config();
 // ================================================================
 // ENVIRONMENT VARIABLES
 // ================================================================
