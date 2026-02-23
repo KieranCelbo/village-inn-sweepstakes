@@ -2,3 +2,6 @@
 serviceAccountKey.json
 node_modules/
 *.log
+.firebase/
+*-firebase-adminsdk.json
+*.xlsx
