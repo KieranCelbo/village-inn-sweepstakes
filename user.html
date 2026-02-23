@@ -234,6 +234,14 @@
       font-family: 'Playfair Display', serif;
     }
     .horse-nr { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 4px 0; }
+    .horse-potential {
+      font-size: 0.68rem; color: var(--green); font-weight: 600;
+      margin-bottom: 3px; line-height: 1.3;
+    }
+    .horse-form {
+      font-size: 0.7rem; color: var(--text-muted); font-weight: 600;
+      margin: 2px 0 4px; letter-spacing: 0.04em;
+    }
 
     .horse-details {
       font-size: 0.72rem;
@@ -523,10 +531,14 @@
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
-      authDomain: "cheltenham-sweepstakes.firebaseapp.com",
-      projectId: "cheltenham-sweepstakes"
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+  authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+  projectId: "cheltenham-sweepstakes",
+  storageBucket: "cheltenham-sweepstakes.firebasestorage.app",
+  messagingSenderId: "311500302338",
+  appId: "1:311500302338:web:aa0d9034d20708690e9f1b"
     };
 
     const app  = initializeApp(firebaseConfig);
@@ -550,23 +562,56 @@
       return extraPlace ? base + 1 : base;
     }
 
+    // Parse fractional odds string "5/1" → decimal multiplier 5.0
+    function parseOdds(oddsStr) {
+      if (!oddsStr || oddsStr === 'SP' || oddsStr === '') return 1.0;
+      const s = String(oddsStr).trim().toLowerCase();
+      if (s === 'evs' || s === 'evens' || s === '1/1') return 1.0;
+      const frac = s.match(/^(\d+)\/(\d+)$/);
+      if (frac) { const n = parseFloat(frac[1]), d = parseFloat(frac[2]); if (d > 0) return n / d; }
+      const dec = parseFloat(s);
+      if (!isNaN(dec) && dec > 0) return dec >= 2 ? dec - 1 : dec;
+      return 1.0;
+    }
+
+    // Get paid place count for a race — uses Bet365 ew_places stored on runners,
+    // falls back to runner count rules if not available
+    function getRacePlaces(race) {
+      const n = (race.runners||[]).length;
+      // Try to read ew_places from any runner (all runners share the same race terms)
+      const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
+      const base = runnerWithEw ? (runnerWithEw.ew_places || 0) : getPlaceCount(n, false);
+      return race.extraPlace ? base + 1 : base;
+    }
+
+    // Get place fraction denominator (4 = 1/4, 5 = 1/5) from Bet365 data
+    function getEwDenom(race) {
+      const runnerWithEw = (race.runners||[]).find(r => r.ew_denom > 0);
+      return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
+    }
+
     function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
-      const n = (race.runners||[]).length;
-      const places = getPlaceCount(n, race.extraPlace);
+      const places = getRacePlaces(race);
       const { winner, second, third, fourth, fifth } = race.result;
-      if (horseMatch(horseName, winner))                return 10;
-      if (places >= 2 && horseMatch(horseName, second)) return 5;
-      if (places >= 3 && horseMatch(horseName, third))  return 5;
-      if (places >= 4 && horseMatch(horseName, fourth)) return 5;
-      if (places >= 5 && horseMatch(horseName, fifth))  return 5;
+      const STAKE = 10;
+
+      // Find this horse's odds
+      const runner = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+      const oddsDecimal = parseOdds(runner?.odds);
+      const ewDenom = getEwDenom(race);
+
+      if (horseMatch(horseName, winner))                return Math.round((oddsDecimal + 1) * STAKE);
+      if (places >= 2 && horseMatch(horseName, second)) return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
+      if (places >= 3 && horseMatch(horseName, third))  return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
+      if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
+      if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
       return 0;
     }
 
     function getOutcomeLabel(race, horseName) {
       if (!race.result || !horseName) return null;
-      const n = (race.runners||[]).length;
-      const places = getPlaceCount(n, race.extraPlace);
+      const places = getRacePlaces(race);
       const { winner, second, third, fourth, fifth } = race.result;
       if (horseMatch(horseName, winner))                return 'win';
       if (places >= 2 && horseMatch(horseName, second)) return 'place';
@@ -698,8 +743,9 @@
           </div>`;
       }
 
-      // Place hint in header
-      const paidPlaces = places - 1; // places includes winner, hint shows placed positions only
+      // Place hint — uses Bet365 ew_places where available
+      const paidPlaces = getRacePlaces(race) - 1;
+      const ewDenom = getEwDenom(race);
       const placeHint = paidPlaces + ' place' + (paidPlaces !== 1 ? 's' : '') + (race.extraPlace ? ' +extra' : '');
 
       const horsesHtml = locked
@@ -716,11 +762,17 @@
                   <div class="horse-check">✓</div>
                   ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
                   <div class="horse-name">${esc(horse.name)}</div>
-                  ${isNR ? `<div class="horse-nr">Non-Runner</div>` :
-                    horse.odds && horse.odds !== 'SP'
-                      ? `<div class="horse-odds">${horse.odds}</div>`
-                      : horse.form ? `<div class="horse-odds" style="font-size:0.78rem;color:var(--text-muted)">Form: ${horse.form}</div>` : '<div class="horse-odds" style="opacity:0">&nbsp;</div>'
-                  }
+                  ${isNR ? `<div class="horse-nr">Non-Runner</div>` : (() => {
+                    const _odds = horse.odds && horse.odds !== 'SP' ? horse.odds : null;
+                    const _od = _odds ? parseOdds(_odds) : null;
+                    const _winPts   = _od !== null ? Math.round((_od + 1) * 10) : null;
+                    const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 10) : null;
+                    return (_odds
+                      ? `<div class="horse-odds">${_odds}</div>
+                         <div class="horse-potential">Win: +${_winPts}pts · Place: +${_placePts}pts</div>`
+                      : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
+                      + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
+                  })()}
                   <div class="horse-details">
                     ${horse.jockey  ? `🧑 ${esc(horse.jockey)}<br>` : ''}
                     ${horse.trainer ? `🎓 ${esc(horse.trainer)}` : ''}

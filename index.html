@@ -152,10 +152,14 @@
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
-      authDomain: "cheltenham-sweepstakes.firebaseapp.com",
-      projectId: "cheltenham-sweepstakes"
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+  authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+  projectId: "cheltenham-sweepstakes",
+  storageBucket: "cheltenham-sweepstakes.firebasestorage.app",
+  messagingSenderId: "311500302338",
+  appId: "1:311500302338:web:aa0d9034d20708690e9f1b"
     };
 
     const app = initializeApp(firebaseConfig);

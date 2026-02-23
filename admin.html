@@ -163,7 +163,7 @@
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <span style="font-weight:600;color:var(--text-muted);font-size:0.9rem;">🔄 Auto-fetch from Racing API:</span>
           <button class="btn btn-secondary btn-sm" id="fetch-past-results-btn">🏆 Fetch Today's Results</button>
-          <span style="font-size:0.8rem;color:var(--text-muted);">Free API only supports today's results — use the manual result button on each race for older dates</span>
+          <span style="font-size:0.8rem;color:var(--text-muted);">Fetches today's results automatically — use the manual result button on each race for older dates</span>
         </div>
       </div>
     </div>
@@ -242,15 +242,19 @@
 <div id="toast-container"></div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
   import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
-    authDomain: "cheltenham-sweepstakes.firebaseapp.com",
-    projectId: "cheltenham-sweepstakes"
-  };
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+  authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+  projectId: "cheltenham-sweepstakes",
+  storageBucket: "cheltenham-sweepstakes.firebasestorage.app",
+  messagingSenderId: "311500302338",
+  appId: "1:311500302338:web:aa0d9034d20708690e9f1b"
+};
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -289,6 +293,49 @@
   function getPlaces(numRunners, extraPlace) {
     const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
     return extraPlace ? base + 1 : base;
+  }
+
+  // Parse fractional odds "5/1" → 5.0
+  function parseOdds(oddsStr) {
+    if (!oddsStr || oddsStr === 'SP' || oddsStr === '') return 1.0;
+    const s = String(oddsStr).trim().toLowerCase();
+    if (s === 'evs' || s === 'evens' || s === '1/1') return 1.0;
+    const frac = s.match(/^(\d+)\/(\d+)$/);
+    if (frac) { const n = parseFloat(frac[1]), d = parseFloat(frac[2]); if (d > 0) return n / d; }
+    const dec = parseFloat(s);
+    if (!isNaN(dec) && dec > 0) return dec >= 2 ? dec - 1 : dec;
+    return 1.0;
+  }
+
+  // Get paid places from Bet365 ew_places stored on runners, fall back to runner count
+  function getRacePlaces(race) {
+    const n = (race.runners||[]).length;
+    const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
+    const base = runnerWithEw ? (runnerWithEw.ew_places || 0) : getPlaces(n, false);
+    return race.extraPlace ? base + 1 : base;
+  }
+
+  // Get place fraction denominator from Bet365 data (4 = 1/4, 5 = 1/5)
+  function getEwDenom(race) {
+    const runnerWithEw = (race.runners||[]).find(r => r.ew_denom > 0);
+    return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
+  }
+
+  // Calculate points for a pick using odds-based scoring
+  function calcPoints(race, horseName) {
+    if (!race.result || !horseName) return 0;
+    const places = getRacePlaces(race);
+    const { winner, second, third, fourth, fifth } = race.result;
+    const runner = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+    const od = parseOdds(runner?.odds);
+    const ewDenom = getEwDenom(race);
+    const STAKE = 10;
+    if (horseMatch(horseName, winner))                return Math.round((od + 1) * STAKE);
+    if (places >= 2 && horseMatch(horseName, second)) return Math.round((od / ewDenom + 1) * STAKE);
+    if (places >= 3 && horseMatch(horseName, third))  return Math.round((od / ewDenom + 1) * STAKE);
+    if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((od / ewDenom + 1) * STAKE);
+    if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((od / ewDenom + 1) * STAKE);
+    return 0;
   }
 
   function showToast(msg, type='info') {
@@ -431,13 +478,13 @@
         const race = racesCache[p.raceId];
         if (!race||!race.result) continue;
         const n = (race.runners||[]).length;
-        const places = getPlaces(n, race.extraPlace);
         const {winner,second,third,fourth,fifth} = race.result;
-        if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-        else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-        else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-        else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-        else if (places>=5&&horseMatch(p.horseName,fifth))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+        const _pts = calcPoints(race, p.horseName);
+        if (_pts > 0) {
+          scores[p.userId].pts += _pts;
+          if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
+          else scores[p.userId].places++;
+        }
       }
 
       const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
@@ -498,13 +545,53 @@
     if (!name||!username||!pw){errEl.textContent='Please fill in all fields.';errEl.style.display='block';return;}
     if (pw.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
     try {
-      const email=username+'@cheltenham.local';
-      const cred=await createUserWithEmailAndPassword(auth,email,pw);
-      await setDoc(doc(db,'users',cred.user.uid),{displayName:name,username,role,email,createdAt:new Date().toISOString()});
+      const email = username + '@cheltenham.local';
+      // Use a secondary app instance so creating the user does NOT sign the admin out
+      const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + Date.now());
+      const secondaryAuth = getAuth(secondaryApp);
+      let cred;
+      try {
+        cred = await createUserWithEmailAndPassword(secondaryAuth, email, pw);
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          displayName: name, username, role, email,
+          createdAt: new Date().toISOString()
+        });
+      } finally {
+        // Always clean up the secondary app — critical so admin stays signed in
+        await secondaryAuth.signOut().catch(()=>{});
+        await deleteApp(secondaryApp).catch(()=>{});
+      }
       document.getElementById('user-modal').style.display='none';
-      showToast('✅ Player added!','success');
+      showToast(`✅ ${name} added! They can now log in with username "${username}".`, 'success');
       await loadUsers(); updateStats();
-    } catch(err){errEl.textContent=err.message;errEl.style.display='block';}
+    } catch(err) {
+      let msg = err.message;
+      if (err.code === 'auth/email-already-in-use') {
+        // Check if it's an orphaned account (Auth exists but no Firestore profile)
+        // If so, delete the orphaned Auth account via proxy and retry
+        try {
+          const email = username + '@cheltenham.local';
+          // Ask proxy to look up and delete the orphaned auth user by email
+          const cleanResp = await fetch(`${PROXY_BASE}/admin/delete-auth-user-by-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          });
+          if (cleanResp.ok) {
+            // Retry creation
+            errEl.textContent = 'Previous orphaned account found — retrying…';
+            errEl.style.display = 'block';
+            document.getElementById('save-user-btn').click();
+            return;
+          }
+        } catch(retryErr) { /* ignore */ }
+        msg = `Username "${username}" already exists. If you just deleted this user, wait a moment and try again, or use a different username.`;
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password must be at least 6 characters.';
+      }
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    }
   });
 
   async function resetPW(uid,name) {
@@ -514,13 +601,37 @@
     showToast(`Password saved for ${name}. Note: Firebase requires the user to be logged in to change their own Auth password. Share the new password directly.`,'success');
   }
 
-  async function deleteUser(uid,name) {
-    if (!confirm(`Delete "${name}"?\n\nThis will also remove all their picks.`)) return;
+  async function deleteUser(uid, name) {
+    if (!confirm(`Delete "${name}"?\n\nThis will remove their account, picks, and allow re-use of the same username.`)) return;
     try {
+      // 1. Delete all picks
       const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',uid)));
       for (const d of picksSnap.docs) await deleteDoc(doc(db,'picks',d.id));
+
+      // 2. Delete Firestore profile
       await deleteDoc(doc(db,'users',uid));
-      showToast(`🗑️ ${name} and their picks removed`, 'success');
+
+      // 3. Delete from Firebase Auth via proxy (server-side Admin SDK)
+      //    The proxy has Firebase Admin credentials and can delete any Auth account.
+      try {
+        const resp = await fetch(`${PROXY_BASE}/admin/delete-auth-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid })
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          console.warn('Proxy auth delete failed:', result.error || resp.status);
+          // Non-fatal: Firestore profile is gone so login returns "profile missing"
+          // Admin can still recreate with same username if Auth account is cleaned up
+        }
+      } catch(authErr) {
+        console.warn('Could not reach proxy for auth delete:', authErr.message);
+        // Non-fatal — profile is deleted, orphaned auth account blocks username reuse
+        // but proxy will handle it on next creation attempt
+      }
+
+      showToast(`🗑️ ${name} fully removed. You can recreate them with the same username.`, 'success');
       await loadUsers(); loadLeaderboard(); updateStats();
     } catch(err) {
       showToast('❌ Error deleting user: ' + err.message, 'error');
@@ -655,8 +766,10 @@
               const odd = (oddsData.odds && oddsData.odds[timeKey])
                        || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
                        || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+              const detail = oddsData.runnerDetails && oddsData.runnerDetails[timeKey];
               if (odd) oddsMatched++;
-              return { ...r, odds: odd || 'SP' };
+              return { ...r, odds: odd || 'SP',
+                ...(detail ? { ew_places: detail.ew_places, ew_denom: detail.ew_denom } : {}) };
             });
             await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
           }
@@ -698,7 +811,7 @@
       }
     } catch(e) { console.warn('Odds refresh skipped:', e.message); }
     try {
-      const data=await callAPI(`/results/${activeMeeting.day}/free`);
+      const data=await callAPI('/results/today');
       const vr=(data.results||[]).filter(r=>venueMatch(r.course||'',activeMeeting.venue));
       let updated=0;
       for (const result of vr) {
@@ -728,9 +841,7 @@
     this.disabled = true; this.textContent = '⏳ Fetching…';
     try {
       // Try today endpoint first, fall back to /results/free
-      let data;
-      try { data = await callAPI('/results/today/free'); }
-      catch(e) { data = await callAPI('/results/free'); }
+      const data = await callAPI('/results/today');
 
       const results = data.results || [];
       if (!results.length) { showToast('No results from API yet — races may not have finished','info'); return; }
@@ -817,7 +928,9 @@
                        || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
                        || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
             if (odd) matched++;
-            return { ...r, odds: odd || r.odds || 'SP' };
+            const _detail = oddsData.runnerDetails && oddsData.runnerDetails[_normTime + '|' + r.name.toUpperCase()];
+            return { ...r, odds: odd || r.odds || 'SP',
+              ...(_detail ? { ew_places: _detail.ew_places, ew_denom: _detail.ew_denom } : {}) };
           });
           await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
         }
@@ -945,30 +1058,36 @@
           allRenderedRaces.push(race);
           const picks = allPicks.filter(p => p.raceId === race.id);
           const hasResult = !!race.result;
-          const n = (race.runners||[]).length;
-          const places = getPlaces(n, race.extraPlace);
+          const places = getRacePlaces(race);
 
           const outcomeLabel = (pick) => {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
-            if (horseMatch(pick.horseName,winner)) return '<span class="badge badge-gold">🏆 Won</span>';
-            if (places>=2&&horseMatch(pick.horseName,second)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed</span>';
-            if (places>=3&&horseMatch(pick.horseName,third))  return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed</span>';
-            if (places>=4&&horseMatch(pick.horseName,fourth)) return '<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed</span>';
+            const _pts = calcPoints(race, pick.horseName);
+            const _ptsStr = _pts > 0 ? ` +${_pts}pts` : '';
+            if (horseMatch(pick.horseName,winner)) return `<span class="badge badge-gold">🏆 Won${_ptsStr}</span>`;
+            if (places>=2&&horseMatch(pick.horseName,second)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed${_ptsStr}</span>`;
+            if (places>=3&&horseMatch(pick.horseName,third))  return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed${_ptsStr}</span>`;
+            if (places>=4&&horseMatch(pick.horseName,fourth)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed${_ptsStr}</span>`;
             return '<span class="badge badge-red">❌ Lost</span>';
           };
+
+
+          const n = (race.runners||[]).length;
+          const ewDenom = getEwDenom(race);
 
           html += `<div style="border:1px solid var(--cream-dark);border-top:none;overflow:hidden;${races.indexOf(race)===races.length-1?'border-radius:0 0 12px 12px;margin-bottom:16px;':''}">
             <div style="background:var(--cream-dark);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div>
                 <strong>${race.time} — ${esc(race.name)}</strong>
-                <div style="font-size:0.82rem;color:var(--text-muted);">${picks.length} pick${picks.length!==1?'s':''} • ${n} runners</div>
+                <div style="font-size:0.82rem;color:var(--text-muted);">${picks.length} pick${picks.length!==1?'s':''} • ${n} runners • ${places-1} place${places-1!==1?'s':''} (1/${ewDenom} odds)</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 ${hasResult?`<span class="badge badge-gold">🏆 ${esc(race.result.winner)}</span>`:''}
                 <button class="btn btn-secondary btn-sm" data-action="open-result" data-race-id="${race.id}">${hasResult?'✏️ Edit':'🏆 Record Result'}</button>
               </div>
             </div>
+
             ${picks.length
               ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th></tr></thead><tbody>
                   ${picks.map(pick => {
@@ -980,13 +1099,13 @@
                     </tr>`;
                   }).join('')}
                 </tbody></table></div>`
-              : `<div style="padding:12px 20px;color:var(--text-muted);font-size:0.85rem;">No picks for this race</div>`
+              : `<div style="padding:10px 20px;color:var(--text-muted);font-size:0.85rem;">No picks for this race</div>`
             }
           </div>`;
-        }
       }
       html += '</div>';
     }
+    } // close for (const date of sortedDates)
 
     el.innerHTML = html;
 
@@ -1151,14 +1270,13 @@
       scores[p.userId].picks++;
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
-      const n=(race.runners||[]).length;
-      const places=getPlaces(n, race.extraPlace);
       const {winner,second,third,fourth,fifth}=race.result;
-      if      (horseMatch(p.horseName,winner))                { scores[p.userId].pts+=10; scores[p.userId].wins++; }
-      else if (places>=2&&horseMatch(p.horseName,second))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=3&&horseMatch(p.horseName,third))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=4&&horseMatch(p.horseName,fourth))     { scores[p.userId].pts+=5;  scores[p.userId].places++; }
-      else if (places>=5&&horseMatch(p.horseName,fifth))      { scores[p.userId].pts+=5;  scores[p.userId].places++; }
+      const _pts = calcPoints(race, p.horseName);
+      if (_pts > 0) {
+        scores[p.userId].pts += _pts;
+        if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
+        else scores[p.userId].places++;
+      }
     }
     const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
     if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
