@@ -601,11 +601,13 @@ const firebaseConfig = {
       const oddsDecimal = parseOdds(runner?.odds);
       const ewDenom = getEwDenom(race);
 
+      const PLACE_STAKE = STAKE / 2;  // Each-way: 10pt stake = 5pt win + 5pt place
       if (horseMatch(horseName, winner))                return Math.round((oddsDecimal + 1) * STAKE);
-      if (places >= 2 && horseMatch(horseName, second)) return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
-      if (places >= 3 && horseMatch(horseName, third))  return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
-      if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
-      if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((oddsDecimal / ewDenom + 1) * STAKE);
+      if (places >= 2 && horseMatch(horseName, second)) return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
+      if (places >= 3 && horseMatch(horseName, third))  return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
+      if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
+      if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
+
       return 0;
     }
 
@@ -766,7 +768,11 @@ const firebaseConfig = {
                     const _odds = horse.odds && horse.odds !== 'SP' ? horse.odds : null;
                     const _od = _odds ? parseOdds(_odds) : null;
                     const _winPts   = _od !== null ? Math.round((_od + 1) * 10) : null;
+<<<<<<< HEAD
                     const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 10) : null;
+=======
+                    const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 5) : null;
+>>>>>>> 8b5cb3e (Fix Place odds)
                     return (_odds
                       ? `<div class="horse-odds">${_odds}</div>
                          <div class="horse-potential">Win: +${_winPts}pts · Place: +${_placePts}pts</div>`

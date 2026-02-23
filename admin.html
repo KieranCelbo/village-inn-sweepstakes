@@ -330,11 +330,14 @@ const firebaseConfig = {
     const od = parseOdds(runner?.odds);
     const ewDenom = getEwDenom(race);
     const STAKE = 10;
+
+    const PLACE_STAKE = STAKE / 2; // Each-way: 10pt stake = 5pt win + 5pt place
     if (horseMatch(horseName, winner))                return Math.round((od + 1) * STAKE);
-    if (places >= 2 && horseMatch(horseName, second)) return Math.round((od / ewDenom + 1) * STAKE);
-    if (places >= 3 && horseMatch(horseName, third))  return Math.round((od / ewDenom + 1) * STAKE);
-    if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((od / ewDenom + 1) * STAKE);
-    if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((od / ewDenom + 1) * STAKE);
+    if (places >= 2 && horseMatch(horseName, second)) return Math.round((od / ewDenom + 1) * PLACE_STAKE);
+    if (places >= 3 && horseMatch(horseName, third))  return Math.round((od / ewDenom + 1) * PLACE_STAKE);
+    if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((od / ewDenom + 1) * PLACE_STAKE);
+    if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((od / ewDenom + 1) * PLACE_STAKE);
+
     return 0;
   }
 
