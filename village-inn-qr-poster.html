@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Village Inn — Sweepstakes QR Poster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      gap: 20px;
+    }
+    .poster {
+      width: 595px;
+      background: #0d2818;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 40px 120px rgba(0,0,0,0.8);
+      padding-bottom: 52px;
+    }
+    .poster::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 4px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.007) 2px, rgba(255,255,255,0.007) 4px);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .frame-outer { position: absolute; inset: 14px; border: 2px solid #c9a84c; pointer-events: none; z-index: 2; }
+    .frame-inner { position: absolute; inset: 20px; border: 1px solid rgba(201,168,76,0.35); pointer-events: none; z-index: 2; }
+    .corner { position: absolute; width: 44px; height: 44px; z-index: 3; }
+    .corner-tl { top: 8px; left: 8px; }
+    .corner-tr { top: 8px; right: 8px; transform: scaleX(-1); }
+    .corner-bl { bottom: 8px; left: 8px; transform: scaleY(-1); }
+    .corner-br { bottom: 8px; right: 8px; transform: scale(-1,-1); }
+    .content {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 50px 60px 0;
+    }
+    .pub-name {
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 7px;
+      color: #c9a84c;
+      margin-bottom: 4px;
+    }
+    .location {
+      font-family: 'EB Garamond', serif;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: rgba(201,168,76,0.55);
+      margin-bottom: 22px;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 22px;
+    }
+    .divider .line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c 40%, #c9a84c 60%, transparent); }
+    .divider .gem { width: 7px; height: 7px; background: #c9a84c; transform: rotate(45deg); flex-shrink: 0; }
+    .divider .gem-sm { width: 4px; height: 4px; background: rgba(201,168,76,0.45); transform: rotate(45deg); flex-shrink: 0; }
+    .presents {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 18px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 2px;
+      margin-bottom: 5px;
+    }
+    .title-main {
+      font-family: 'Playfair Display', serif;
+      font-size: 58px;
+      font-weight: 900;
+      color: #f0e4c0;
+      line-height: 1;
+      text-align: center;
+      letter-spacing: -1px;
+      text-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      margin-bottom: 2px;
+    }
+    .title-sub {
+      font-family: 'Playfair Display', serif;
+      font-size: 30px;
+      font-weight: 700;
+      font-style: italic;
+      color: #c9a84c;
+      margin-bottom: 6px;
+    }
+    .festival-year {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      letter-spacing: 9px;
+      color: rgba(240,228,192,0.38);
+      margin-bottom: 26px;
+    }
+    .horses { width: 100%; height: 64px; margin-bottom: 26px; }
+    .scan-label {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: #c9a84c;
+      margin-bottom: 16px;
+    }
+    .qr-frame {
+      padding: 18px;
+      background: white;
+      position: relative;
+      box-shadow:
+        0 0 0 3px #c9a84c,
+        0 0 0 8px #0d2818,
+        0 0 0 10px rgba(201,168,76,0.5),
+        0 20px 60px rgba(0,0,0,0.6);
+      margin-bottom: 16px;
+    }
+    .qr-frame::before {
+      content: '✦';
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9a84c;
+      font-size: 14px;
+    }
+    .qr-frame img { display: block; width: 220px; height: 220px; }
+    .qr-url {
+      font-family: 'EB Garamond', serif;
+      font-size: 13px;
+      color: rgba(240,228,192,0.4);
+      letter-spacing: 1px;
+      margin-bottom: 28px;
+    }
+    .how-heading {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: rgba(201,168,76,0.6);
+      margin-bottom: 16px;
+    }
+    .steps { display: flex; width: 100%; margin-bottom: 28px; }
+    .step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0 6px;
+      position: relative;
+    }
+    .step + .step::before {
+      content: '›';
+      position: absolute;
+      left: -6px;
+      top: 7px;
+      color: rgba(201,168,76,0.3);
+      font-size: 20px;
+    }
+    .step-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid #c9a84c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: #c9a84c;
+    }
+    .step-text {
+      font-family: 'EB Garamond', serif;
+      font-size: 12.5px;
+      color: rgba(240,228,192,0.6);
+      text-align: center;
+      line-height: 1.4;
+    }
+    .points-banner {
+      width: 100%;
+      background: rgba(201,168,76,0.07);
+      border: 1px solid rgba(201,168,76,0.22);
+      padding: 14px 24px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .points-tagline {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 17px;
+      color: #c9a84c;
+      margin-bottom: 4px;
+    }
+    .points-detail {
+      font-family: 'EB Garamond', serif;
+      font-size: 13px;
+      color: rgba(240,228,192,0.4);
+    }
+    .footer-credit {
+      font-family: 'EB Garamond', serif;
+      font-size: 10px;
+      color: rgba(201,168,76,0.2);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .poster { box-shadow: none; }
+      .controls { display: none !important; }
+    }
+    .controls { display: flex; gap: 12px; }
+    .btn-print {
+      background: #c9a84c;
+      color: #0d2818;
+      border: none;
+      padding: 13px 28px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-print:hover { background: #dbb85a; }
+  </style>
+</head>
+<body>
+
+  <div class="poster">
+    <div class="frame-outer"></div>
+    <div class="frame-inner"></div>
+
+    <div class="corner corner-tl">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 41 L3 3 L41 3" stroke="#c9a84c" stroke-width="1.5"/>
+        <path d="M3 22 Q13 13 22 3" stroke="#c9a84c" stroke-width="0.75" opacity="0.45"/>
+        <circle cx="3" cy="3" r="3" fill="#c9a84c"/>
+        <circle cx="22" cy="3" r="1.5" fill="rgba(201,168,76,0.4)"/>
+        <circle cx="3" cy="22" r="1.5" fill="rgba(201,168,76,0.4)"/>
+      </svg>
+    </div>
+    <div class="corner corner-tr">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 41 L3 3 L41 3" stroke="#c9a84c" stroke-width="1.5"/>
+        <path d="M3 22 Q13 13 22 3" stroke="#c9a84c" stroke-width="0.75" opacity="0.45"/>
+        <circle cx="3" cy="3" r="3" fill="#c9a84c"/>
+        <circle cx="22" cy="3" r="1.5" fill="rgba(201,168,76,0.4)"/>
+        <circle cx="3" cy="22" r="1.5" fill="rgba(201,168,76,0.4)"/>
+      </svg>
+    </div>
+    <div class="corner corner-bl">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 41 L3 3 L41 3" stroke="#c9a84c" stroke-width="1.5"/>
+        <path d="M3 22 Q13 13 22 3" stroke="#c9a84c" stroke-width="0.75" opacity="0.45"/>
+        <circle cx="3" cy="3" r="3" fill="#c9a84c"/>
+        <circle cx="22" cy="3" r="1.5" fill="rgba(201,168,76,0.4)"/>
+        <circle cx="3" cy="22" r="1.5" fill="rgba(201,168,76,0.4)"/>
+      </svg>
+    </div>
+    <div class="corner corner-br">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 41 L3 3 L41 3" stroke="#c9a84c" stroke-width="1.5"/>
+        <path d="M3 22 Q13 13 22 3" stroke="#c9a84c" stroke-width="0.75" opacity="0.45"/>
+        <circle cx="3" cy="3" r="3" fill="#c9a84c"/>
+        <circle cx="22" cy="3" r="1.5" fill="rgba(201,168,76,0.4)"/>
+        <circle cx="3" cy="22" r="1.5" fill="rgba(201,168,76,0.4)"/>
+      </svg>
+    </div>
+
+    <div class="content">
+
+      <div class="pub-name">The Village Inn</div>
+      <div class="location">Celbridge · Co. Kildare</div>
+
+      <div class="divider">
+        <div class="line"></div><div class="gem-sm"></div><div class="gem"></div><div class="gem-sm"></div><div class="line"></div>
+      </div>
+
+      <div class="presents">presents</div>
+      <div class="title-main">Cheltenham</div>
+      <div class="title-sub">Sweepstakes</div>
+      <div class="festival-year">Festival · 2026</div>
+
+      <svg class="horses" viewBox="0 0 475 64" xmlns="http://www.w3.org/2000/svg">
+        <g opacity="0.18" fill="#c9a84c">
+          <ellipse cx="72" cy="44" rx="20" ry="7"/>
+          <ellipse cx="76" cy="36" rx="8" ry="6.5"/>
+          <ellipse cx="83" cy="32" rx="4.5" ry="3.5"/>
+          <rect x="65" y="51" width="3" height="9" rx="1.5"/>
+          <rect x="71" y="51" width="3" height="9" rx="1.5"/>
+          <rect x="56" y="50" width="3" height="8" rx="1.5" transform="rotate(-8,56,50)"/>
+          <rect x="62" y="51" width="3" height="8" rx="1.5"/>
+          <ellipse cx="76" cy="27" rx="3.5" ry="3.5"/>
+          <rect x="73" y="30" width="6" height="5" rx="1"/>
+        </g>
+        <g opacity="0.5" fill="#c9a84c">
+          <ellipse cx="238" cy="41" rx="30" ry="10"/>
+          <ellipse cx="243" cy="29" rx="12" ry="9.5"/>
+          <ellipse cx="254" cy="23" rx="6.5" ry="5.5"/>
+          <rect x="231" y="51" width="4" height="11" rx="2"/>
+          <rect x="239" y="51" width="4" height="11" rx="2"/>
+          <rect x="218" y="50" width="4" height="10" rx="2" transform="rotate(-10,218,50)"/>
+          <rect x="225" y="51" width="4" height="10" rx="2"/>
+          <ellipse cx="244" cy="19" rx="5" ry="5"/>
+          <rect x="239" y="24" width="8" height="7" rx="1.5"/>
+          <path d="M241 16 Q244 13 249 15" stroke="#c9a84c" stroke-width="1.5" fill="none" opacity="0.8"/>
+        </g>
+        <g opacity="0.3" fill="#c9a84c">
+          <ellipse cx="390" cy="43" rx="24" ry="8.5"/>
+          <ellipse cx="395" cy="33" rx="10" ry="8"/>
+          <ellipse cx="404" cy="28" rx="5.5" ry="4.5"/>
+          <rect x="385" y="51" width="3.5" height="10" rx="1.75"/>
+          <rect x="392" y="51" width="3.5" height="10" rx="1.75"/>
+          <rect x="373" y="50" width="3.5" height="9" rx="1.75" transform="rotate(-9,373,50)"/>
+          <rect x="379" y="51" width="3.5" height="9" rx="1.75"/>
+          <ellipse cx="396" cy="25" rx="4" ry="4"/>
+          <rect x="392" y="29" width="7" height="6" rx="1"/>
+        </g>
+        <line x1="30" y1="61" x2="445" y2="61" stroke="rgba(201,168,76,0.15)" stroke-width="1" stroke-dasharray="6,8"/>
+        <rect x="440" y="20" width="2.5" height="42" fill="rgba(201,168,76,0.2)" rx="1"/>
+        <rect x="436" y="18" width="12" height="5" fill="rgba(201,168,76,0.15)" rx="1"/>
+      </svg>
+
+      <div class="scan-label">Scan to Play</div>
+
+      <div class="qr-frame">
+        <img id="qr-img"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https%3A%2F%2Fcheltenham-sweepstakes.web.app%2F&color=0d2818&bgcolor=ffffff&margin=2&ecc=M"
+          alt="QR Code"
+          width="220"
+          height="220"
+        >
+      </div>
+
+      <div class="qr-url">cheltenham-sweepstakes.web.app</div>
+
+      <div class="divider" style="margin-bottom:18px;">
+        <div class="line"></div><div class="gem-sm"></div><div class="gem"></div><div class="gem-sm"></div><div class="line"></div>
+      </div>
+
+      <div class="how-heading">How to Play</div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Scan the code &amp; sign in</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Pick one horse per race</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Score points for wins &amp; places</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">Top the leaderboard!</div>
+        </div>
+      </div>
+
+      <div class="points-banner">
+        <div class="points-tagline">Pick your horses. Back your judgement.</div>
+        <div class="points-detail">10 pts for a winner &nbsp;·&nbsp; 5 pts for a placed horse</div>
+      </div>
+
+      <div class="footer-credit">The Village Inn · Celbridge · Cheltenham 2026</div>
+
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-print" onclick="window.print()">🖨&nbsp; Print Poster</button>
+  </div>
+
+</body>
+</html>
