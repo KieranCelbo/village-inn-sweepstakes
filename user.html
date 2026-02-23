@@ -768,11 +768,8 @@ const firebaseConfig = {
                     const _odds = horse.odds && horse.odds !== 'SP' ? horse.odds : null;
                     const _od = _odds ? parseOdds(_odds) : null;
                     const _winPts   = _od !== null ? Math.round((_od + 1) * 10) : null;
-<<<<<<< HEAD
-                    const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 10) : null;
-=======
                     const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 5) : null;
->>>>>>> 8b5cb3e (Fix Place odds)
+
                     return (_odds
                       ? `<div class="horse-odds">${_odds}</div>
                          <div class="horse-potential">Win: +${_winPts}pts · Place: +${_placePts}pts</div>`
