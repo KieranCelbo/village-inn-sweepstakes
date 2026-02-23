@@ -1,7 +1,11 @@
 require('dotenv').config();
 const https = require('https');
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+const path = require('path');
+
+// Load live service account
+const SA_PATH = process.env.FIREBASE_SA_PATH || path.join(__dirname, 'cheltenham-sweepstakes-firebase-adminsdk.json');
+const serviceAccount = require(SA_PATH);
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
@@ -36,26 +40,28 @@ async function resyncRunners() {
   const cfg = await db.collection('config').doc('activeMeeting').get();
   if (!cfg.exists) { console.log('No active meeting'); return; }
   const meeting = cfg.data();
-
-  const today = new Date().toISOString().split('T')[0];
+  const today    = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  // Only sync if the meeting is today or tomorrow
   if (meeting.date !== today && meeting.date !== tomorrow) {
     console.log(`Active meeting (${meeting.date}) is not today or tomorrow — skipping`);
     return;
   }
 
-  const day = meeting.date === tomorrow ? 'tomorrow' : 'today';
-  console.log(`Re-syncing ${meeting.venue} (${day})…`);
+  console.log(`Re-syncing ${meeting.venue} (${meeting.date})…`);
 
-  const data = await callAPI(`/racecards/free?day=${day}`);
+  // Standard plan: /racecards/standard (no day param needed)
+  const data = await callAPI('/racecards/standard');
+
   const venueRaces = (data.racecards||[]).filter(r =>
-    (r.course||'').toLowerCase() === meeting.venue.toLowerCase()
+    (r.course||'').toLowerCase().replace(/\s*\([a-z]{2,3}\)\s*$/, '').trim() ===
+    meeting.venue.toLowerCase().trim()
   );
 
   if (!venueRaces.length) {
     console.log('No races found from API for', meeting.venue);
+    const available = [...new Set((data.racecards||[]).map(r=>r.course))].slice(0,8);
+    console.log('Available courses:', available.join(', '));
     return;
   }
 
@@ -71,11 +77,14 @@ async function resyncRunners() {
     const freshRunnerNames = (fresh.runners||[]).map(h => normHorse(h.horse||h.name||''));
 
     const updatedRunners = (stored.runners||[]).map(runner => {
-      // Check if this runner is still in the fresh racecard
+      const freshData = (fresh.runners||[]).find(h =>
+        normHorse(h.horse||h.name||'') === normHorse(runner.name)
+      );
       const stillPresent = freshRunnerNames.includes(normHorse(runner.name));
-      // Check if API flags them as NR
-      const freshData = (fresh.runners||[]).find(h => normHorse(h.horse||h.name||'') === normHorse(runner.name));
-      const apiNR = freshData && !!(freshData.non_runner||freshData.is_non_runner||freshData.status==='Non Runner'||freshData.status==='Withdrawn');
+      const apiNR = freshData && !!(
+        freshData.non_runner || freshData.is_non_runner ||
+        freshData.status === 'Non Runner' || freshData.status === 'Withdrawn'
+      );
       const isNR = !stillPresent || apiNR;
 
       if (isNR && !runner.nr) {
@@ -83,11 +92,12 @@ async function resyncRunners() {
         console.log(`  NR: ${runner.name} (${stored.name})`);
       }
 
-      // Update jockey/trainer from fresh data if available
+      // Also update form from fresh data
       return {
         ...runner,
         jockey:  freshData?.jockey  || runner.jockey  || '',
         trainer: freshData?.trainer || runner.trainer || '',
+        form:    freshData?.form    || runner.form    || '',
         nr: isNR
       };
     });
