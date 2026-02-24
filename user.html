@@ -344,6 +344,632 @@
 
     .pick-points { font-weight: 700; color: var(--green); font-size: 0.85rem; flex-shrink: 0; }
     .pick-points.place-pts { color: #c08000; }
+    .pick-points.lost-pts  { color: var(--red); }
+    .points-badge.lost-points { background: var(--red); }
+    .picks-day-points.neg  { background: rgba(192,57,43,0.3); }
+
+    .picks-empty {
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .picks-empty .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+    /* ===== SCORING INFO ===== */
+    .scoring-info {
+      background: linear-gradient(135deg, rgba(27,77,46,0.06), rgba(201,168,76,0.06));
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .scoring-info strong { color: var(--green); }
+    .scoring-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+    .scoring-rule { display: flex; align-items: center; gap: 8px; }
+    .scoring-pts { font-weight: 800; color: var(--gold-dark); font-family: 'Playfair Display', serif; font-size: 1rem; }
+
+    /* ===== USER MOBILE ===== */
+    @media (max-width: 768px) {
+      .page-header { padding: 16px 18px; border-radius: 14px; }
+      .page-header h2 { font-size: 1.3rem; }
+      .meeting-badge { padding: 8px 14px; }
+      .meeting-badge .meeting-venue { font-size: 1rem; }
+
+      .picks-summary { padding: 14px 16px; gap: 6px; }
+      .summary-num { font-size: 1.6rem; }
+      .summary-label { font-size: 0.7rem; }
+
+      .user-tabs { margin-bottom: 16px; }
+      .user-tab-btn { padding: 9px 10px; font-size: 0.82rem; }
+
+      .scoring-info { padding: 12px 14px; font-size: 0.8rem; }
+      .scoring-grid { gap: 10px; }
+
+      .race-card { border-radius: 14px; margin-bottom: 14px; }
+      .race-card-header { padding: 12px 14px; gap: 8px; }
+      .race-time { font-size: 1.1rem; padding: 6px 12px; }
+      .race-name { font-size: 0.95rem; }
+      .race-info { font-size: 0.75rem; }
+      .race-status-area { gap: 6px; }
+      .lock-badge { font-size: 0.78rem; padding: 4px 10px; }
+      .countdown { font-size: 0.75rem; }
+
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px; }
+      .horse-card { padding: 10px 12px; border-radius: 10px; }
+      .horse-name { font-size: 0.85rem; margin-right: 24px; }
+      .horse-odds { font-size: 1rem; }
+      .horse-details { font-size: 0.68rem; }
+      .horse-number { width: 22px; height: 22px; font-size: 0.68rem; }
+      .horse-check { width: 20px; height: 20px; font-size: 0.75rem; top: -6px; left: -6px; }
+
+      .race-result-bar { padding: 10px 14px; font-size: 0.82rem; gap: 8px; }
+      .race-locked-msg { padding: 12px 14px; font-size: 0.85rem; }
+
+      .picks-day-header { padding: 10px 14px; }
+      .picks-day-title { font-size: 1rem; }
+      .pick-row { padding: 10px 14px; gap: 10px; font-size: 0.82rem; }
+      .pick-time { font-size: 0.75rem; padding: 3px 8px; }
+      .pick-horse { font-size: 0.88rem; }
+      .pick-race { font-size: 0.72rem; }
+    }
+
+    @media (max-width: 420px) {
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 10px; }
+      .horse-card { padding: 8px 10px; }
+      .horse-name { font-size: 0.8rem; }
+      .picks-summary { grid-template-columns: repeat(2, 1fr); }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .meeting-badge { width: 100%; }
+    }
+
+    /* Prevent iOS input zoom */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* Better tap targets */
+    .horse-card { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .user-tab-btn { touch-action: manipulation; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="logo-icon">🏇</div>
+      <div>
+        <h1>The Village Inn Sweepstakes</h1>
+        <p id="user-welcome">Loading…</p>
+      </div>
+    </div>
+    <div class="nav-user">
+      <div class="nav-user-info">
+        <div class="name" id="user-name">—</div>
+        <div class="role">Player</div>
+      </div>
+      <button class="btn-logout" onclick="window.logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-container">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h2>🏁 Sweepstakes</h2>
+        <p>Pick one horse per race. Picks lock 30 minutes before the off.</p>
+      </div>
+      <div class="meeting-badge">
+        <div class="meeting-venue" id="meeting-venue-display">Loading…</div>
+        <div class="meeting-date" id="meeting-date-display">—</div>
+      </div>
+    </div>
+
+    <!-- Summary strip -->
+    <div class="picks-summary">
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-races">—</div>
+        <div class="summary-label">Today's Races</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-picked">—</div>
+        <div class="summary-label">My Picks</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-points">0</div>
+        <div class="summary-label">My Returns</div>
+      </div>
+      <div class="summary-stat">
+        <div class="summary-num" id="summary-open">—</div>
+        <div class="summary-label">Open to Pick</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="user-tabs">
+      <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
+      <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
+      <button class="user-tab-btn" data-utab="leaderboard">🏆 Leaderboard</button>
+    </div>
+
+    <!-- TAB: Races -->
+    <div class="user-tab-panel active" id="utab-races">
+      <!-- Scoring key -->
+      <div class="scoring-info">
+        <strong>📊 How it works:</strong>
+        <div class="scoring-grid">
+          <div class="scoring-rule"><span class="scoring-pts">€5 E/W</span> €5 win + €5 place per pick</div>
+        </div>
+      </div>
+      <div id="races-container">
+        <div class="loading-center">
+          <div class="loading-spinner"></div>
+          <span style="font-size:1.1rem;">Loading races…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: My Picks -->
+    <div class="user-tab-panel" id="utab-mypicks">
+      <div id="mypicks-container">
+        <div class="loading-center">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Leaderboard -->
+    <div class="user-tab-panel" id="utab-leaderboard">
+      <div id="leaderboard-container">
+        <div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBCEsmj9UhkA9Xcr3TkGIGArLPnup0JfQ4",
+  authDomain: "cheltenham-sweepstakes.firebaseapp.com",
+  projectId: "cheltenham-sweepstakes",
+  storageBucket: "cheltenham-sweepstakes.firebasestorage.app",
+  messagingSenderId: "311500302338",
+  appId: "1:311500302338:web:aa0d9034d20708690e9f1b"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    let currentUser  = null;
+    let allRaces     = [];
+    let myPicks      = {};   // raceId -> pick doc
+    let allMyPicks   = [];   // all picks across all dates for My Picks tab
+    let activeMeetingData = null;
+
+    // ===== SCORING =====
+    function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+    function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+
+    // 1-7 runners: winner + 1 place | 8-14: winner + 2 places | 15+: winner + 3 places
+    // extraPlace: admin adds 1 extra paid place for a specific race
+    function getPlaceCount(numRunners, extraPlace) {
+      const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
+      return extraPlace ? base + 1 : base;
+    }
+
+    // Parse fractional odds string "5/1" → decimal multiplier 5.0
+    function parseOdds(oddsStr) {
+      if (!oddsStr || oddsStr === 'SP' || oddsStr === '') return 1.0;
+      const s = String(oddsStr).trim().toLowerCase();
+      if (s === 'evs' || s === 'evens' || s === '1/1') return 1.0;
+      const frac = s.match(/^(\d+)\/(\d+)$/);
+      if (frac) { const n = parseFloat(frac[1]), d = parseFloat(frac[2]); if (d > 0) return n / d; }
+      const dec = parseFloat(s);
+      if (!isNaN(dec) && dec > 0) return dec >= 2 ? dec - 1 : dec;
+      return 1.0;
+    }
+
+    // Get paid place count for a race — uses Bet365 ew_places stored on runners,
+    // falls back to runner count rules if not available
+    function getRacePlaces(race) {
+      const n = (race.runners||[]).length;
+      // Try to read ew_places from any runner (all runners share the same race terms)
+      const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
+      const base = runnerWithEw ? (runnerWithEw.ew_places || 0) : getPlaceCount(n, false);
+      return race.extraPlace ? base + 1 : base;
+    }
+
+    // Get place fraction denominator (4 = 1/4, 5 = 1/5) from Bet365 data
+    function getEwDenom(race) {
+      const runnerWithEw = (race.runners||[]).find(r => r.ew_denom > 0);
+      return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
+    }
+
+    // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
+  // Returns positive (win/place payout), negative (lost = -€10), or 0 (no result yet)
+  function calcPoints(race, horseName) {
+    if (!race.result || !horseName) return 0;
+    const places = getRacePlaces(race);
+    const { winner, second, third, fourth, fifth } = race.result;
+    const runner    = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+    const od        = parseOdds(runner?.odds);  // e.g. 10.0 for 10/1
+    const ewDenom   = getEwDenom(race);          // 4 = 1/4 odds, 5 = 1/5 odds
+    const WIN_STAKE   = 5;  // €5 on win
+    const PLACE_STAKE = 5;  // €5 on place
+    const TOTAL_STAKE = WIN_STAKE + PLACE_STAKE; // €10 total outlay
+    if (horseMatch(horseName, winner)) {
+      // Win: both win and place parts pay out
+      const winReturn   = (od + 1) * WIN_STAKE;
+      const placeReturn = ((od / ewDenom) + 1) * PLACE_STAKE;
+      return Math.round((winReturn + placeReturn) * 100) / 100;
+    }
+    const placed =
+      (places >= 2 && horseMatch(horseName, second)) ||
+      (places >= 3 && horseMatch(horseName, third))  ||
+      (places >= 4 && horseMatch(horseName, fourth)) ||
+      (places >= 5 && horseMatch(horseName, fifth));
+    if (placed) {
+      // Place only: win stake lost, place stake returns at fraction odds
+      return Math.round(((od / ewDenom) + 1) * PLACE_STAKE * 100) / 100;
+    }
+    // Lost: full stake gone
+    return -TOTAL_STAKE;
+  }OCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Picks — The Village Inn Sweepstakes</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== PAGE HEADER ===== */
+    .page-header {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-mid) 100%);
+      color: white;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .page-header h2 { color: var(--gold-light); font-size: 1.6rem; margin: 0; }
+    .page-header p { color: rgba(255,255,255,0.7); margin-top: 4px; font-size: 0.9rem; }
+
+    .meeting-badge {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .meeting-badge .meeting-venue { font-size: 1.1rem; color: var(--gold-light); }
+    .meeting-badge .meeting-date { font-size: 0.8rem; opacity: 0.8; margin-top: 2px; }
+
+    /* ===== TABS ===== */
+    .user-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--cream-dark);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .user-tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .user-tab-btn.active {
+      background: var(--white);
+      color: var(--green);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .user-tab-panel { display: none; }
+    .user-tab-panel.active { display: block; }
+
+    /* ===== SUMMARY STRIP ===== */
+    .picks-summary {
+      background: var(--green);
+      color: white;
+      border-radius: var(--radius-lg);
+      padding: 18px 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    @media(max-width:600px){ .picks-summary { grid-template-columns: repeat(2,1fr); } }
+    .summary-stat { text-align: center; padding: 4px; }
+    .summary-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--gold-light);
+      line-height: 1;
+    }
+    .summary-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    /* ===== RACE CARD ===== */
+    .race-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .race-card:hover { box-shadow: var(--shadow-lg); }
+
+    .race-card-header {
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-bottom: 2px solid var(--cream-dark);
+    }
+    .race-card-header.locked {
+      background: #faf5f5;
+      border-bottom-color: #f0d0d0;
+    }
+    .race-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+    .race-time {
+      background: var(--green);
+      color: white;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .race-time.locked-time { background: #b0b0b0; }
+
+    .race-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1.3;
+    }
+    .race-info { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; }
+
+    .race-status-area { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .countdown { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+    .countdown.urgent { color: var(--red); }
+
+    .picked-badge {
+      background: var(--green);
+      color: white;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    /* ===== HORSE GRID ===== */
+    .horses-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 16px 20px;
+    }
+    @media(max-width:600px) {
+      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+    }
+
+    .horse-card {
+      border: 2px solid var(--cream-dark);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.18s;
+      position: relative;
+      background: var(--white);
+      user-select: none;
+    }
+    .horse-card:hover:not(.locked-card):not(.picked) {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.05);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(201,168,76,0.18);
+    }
+    .horse-card.picked {
+      border-color: var(--green);
+      background: rgba(27,77,46,0.05);
+      box-shadow: 0 0 0 3px rgba(27,77,46,0.12);
+    }
+    .horse-card.locked-card { cursor: default; opacity: 0.7; }
+    .horse-card.nr-card { opacity: 0.5; cursor: default; }
+
+    .horse-number {
+      position: absolute;
+      top: 9px; right: 10px;
+      width: 24px; height: 24px;
+      background: var(--cream-dark);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+    }
+    .horse-check {
+      position: absolute;
+      top: -7px; left: -7px;
+      width: 24px; height: 24px;
+      background: var(--green);
+      border-radius: 50%;
+      display: none;
+      align-items: center; justify-content: center;
+      color: white; font-size: 0.85rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .horse-card.picked .horse-check { display: flex; }
+
+    .horse-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-right: 28px;
+      line-height: 1.2;
+    }
+    .horse-card.picked .horse-name { color: var(--green); }
+
+    .horse-odds {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--gold-dark);
+      margin: 5px 0 3px;
+      font-family: 'Playfair Display', serif;
+    }
+    .horse-nr { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 4px 0; }
+    .horse-potential {
+      font-size: 0.68rem; color: var(--green); font-weight: 600;
+      margin-bottom: 3px; line-height: 1.3;
+    }
+    .horse-form {
+      font-size: 0.7rem; color: var(--text-muted); font-weight: 600;
+      margin: 2px 0 4px; letter-spacing: 0.04em;
+    }
+
+    .horse-details {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ===== LOCKED STATE ===== */
+    .race-locked-msg {
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #9b4040;
+      font-weight: 600;
+      font-size: 0.95rem;
+      background: rgba(192,57,43,0.04);
+    }
+
+    /* ===== RESULT BAR ===== */
+    .race-result-bar {
+      padding: 12px 22px;
+      background: rgba(201,168,76,0.1);
+      border-top: 1px solid rgba(201,168,76,0.2);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 0.88rem;
+    }
+    .winner-label { font-weight: 700; color: var(--green); }
+    .place-label { color: var(--text-muted); }
+    .pick-outcome-win { color: var(--green); font-weight: 700; }
+    .pick-outcome-place { color: #c08000; font-weight: 700; }
+    .pick-outcome-lose { color: var(--red); font-weight: 600; }
+
+    .points-badge {
+      margin-left: auto;
+      background: var(--green);
+      color: white;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .points-badge.place-points { background: #c08000; }
+
+    /* ===== MY PICKS TAB ===== */
+    .picks-day-group {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .picks-day-header {
+      background: var(--green);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .picks-day-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--gold-light); }
+    .picks-day-points { font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; }
+    .picks-day-venue { font-size: 0.8rem; opacity: 0.75; margin-top: 1px; }
+
+    .pick-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--cream-dark);
+      font-size: 0.88rem;
+    }
+    .pick-row:last-child { border-bottom: none; }
+    .pick-time {
+      background: var(--cream-dark);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+    .pick-horse { font-weight: 700; color: var(--text); font-family: 'Playfair Display', serif; }
+    .pick-race { color: var(--text-muted); font-size: 0.78rem; flex: 1; }
+    .pick-result-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .badge-win { background: rgba(27,77,46,0.12); color: var(--green); }
+    .badge-place { background: rgba(192,128,0,0.12); color: #c08000; }
+    .badge-lose { background: rgba(192,57,43,0.1); color: var(--red); }
+    .badge-pending { background: var(--cream-dark); color: var(--text-muted); }
+    .badge-no-pick { background: var(--cream-dark); color: var(--text-muted); font-style: italic; }
+
+    .pick-points { font-weight: 700; color: var(--green); font-size: 0.85rem; flex-shrink: 0; }
+    .pick-points.place-pts { color: #c08000; }
+    .pick-points.lost-pts  { color: var(--red); }
+    .points-badge.lost-points { background: var(--red); }
+    .picks-day-points.neg  { background: rgba(192,57,43,0.3); }
 
     .picks-empty {
       padding: 40px 24px;
@@ -742,8 +1368,9 @@ const firebaseConfig = {
             ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
             ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +€${pts.toFixed(2)}</span>` : ''}
             ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +€${pts.toFixed(2)}</span>` : ''}
+                    ${outcome === 'lost' && race.result ? `<span class="pick-outcome-lose">❌ Lost -€10.00</span>` : ''}
             ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ ${esc(picked)}</span>` : ''}
-            ${pts > 0 ? `<span class="points-badge ${outcome==='place'?'place-points':''}">€${pts.toFixed(2)}</span>` : ''}
+            ${pts !== 0 ? `<span class="points-badge ${pts < 0 ? 'lost-points' : outcome==='place'?'place-points':''}">${pts < 0 ? '-€'+Math.abs(pts).toFixed(2) : '+€'+pts.toFixed(2)}</span>` : ''}
           </div>`;
       }
 
@@ -877,7 +1504,7 @@ const firebaseConfig = {
                 <div class="picks-day-title">${dateLabel}</div>
                 ${venue ? `<div class="picks-day-venue">🏟️ ${esc(venue)}</div>` : ''}
               </div>
-              ${dayPoints > 0 ? `<div class="picks-day-points">+€${dayPoints.toFixed(2)}</div>` : ''}
+              ${dayPoints !== 0 ? `<div class="picks-day-points ${dayPoints < 0 ? 'neg' : ''}">${dayPoints < 0 ? '-€'+Math.abs(dayPoints).toFixed(2) : '+€'+dayPoints.toFixed(2)}</div>` : ''}
             </div>
             ${items.map(({ pick, race }) => {
               if (!race) return '';
@@ -904,7 +1531,7 @@ const firebaseConfig = {
                     <div class="pick-race">${esc(race.name)}</div>
                   </div>
                   ${badgeHtml}
-                  ${pts > 0 ? `<div class="pick-points ${outcome==='place'?'place-pts':''}">+€${pts.toFixed(2)}</div>` : ''}
+                  ${pts > 0 ? `<div class="pick-points ${pts < 0 ? 'lost-pts' : outcome==='place'?'place-pts':''}">${pts < 0 ? '-€'+Math.abs(pts).toFixed(2) : '+€'+pts.toFixed(2)}</div>` : ''}
                 </div>`;
             }).join('')}
           </div>`;

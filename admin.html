@@ -322,18 +322,19 @@ const firebaseConfig = {
   }
 
   // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
+  // Returns positive (win/place payout), negative (lost = -€10), or 0 (no result yet)
   function calcPoints(race, horseName) {
     if (!race.result || !horseName) return 0;
-    const places   = getRacePlaces(race);
+    const places = getRacePlaces(race);
     const { winner, second, third, fourth, fifth } = race.result;
-    const runner   = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-    if (!runner) return 0;
-    const od       = parseOdds(runner.odds);  // e.g. 10.0 for 10/1
-    const ewDenom  = getEwDenom(race);         // 4 = 1/4 odds, 5 = 1/5 odds
+    const runner    = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+    const od        = parseOdds(runner?.odds);  // e.g. 10.0 for 10/1
+    const ewDenom   = getEwDenom(race);          // 4 = 1/4 odds, 5 = 1/5 odds
     const WIN_STAKE   = 5;  // €5 on win
     const PLACE_STAKE = 5;  // €5 on place
+    const TOTAL_STAKE = WIN_STAKE + PLACE_STAKE; // €10 total outlay
     if (horseMatch(horseName, winner)) {
-      // Win: €5 stake wins at full odds + €5 stake wins at place fraction
+      // Win: both win and place parts pay out
       const winReturn   = (od + 1) * WIN_STAKE;
       const placeReturn = ((od / ewDenom) + 1) * PLACE_STAKE;
       return Math.round((winReturn + placeReturn) * 100) / 100;
@@ -344,10 +345,11 @@ const firebaseConfig = {
       (places >= 4 && horseMatch(horseName, fourth)) ||
       (places >= 5 && horseMatch(horseName, fifth));
     if (placed) {
-      // Place only: €5 stake wins at place fraction odds
+      // Place only: win stake lost, place stake returns at fraction odds
       return Math.round(((od / ewDenom) + 1) * PLACE_STAKE * 100) / 100;
     }
-    return 0;
+    // Lost: full stake gone
+    return -TOTAL_STAKE;
   }
 
   function showToast(msg, type='info') {
