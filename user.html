@@ -580,12 +580,13 @@ const firebaseConfig = {
 
     // Get paid place count for a race — uses Bet365 ew_places stored on runners,
     // falls back to runner count rules if not available
+    // Use Bet365 ew_places directly — already includes any extra places they offer
     function getRacePlaces(race) {
       const n = (race.runners||[]).length;
-      // Try to read ew_places from any runner (all runners share the same race terms)
       const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
-      const base = runnerWithEw ? (runnerWithEw.ew_places || 0) : getPlaceCount(n, false);
-      return race.extraPlace ? base + 1 : base;
+      if (runnerWithEw) return runnerWithEw.ew_places;
+      // Fallback if no Bet365 data: standard rules
+      return n <= 7 ? 2 : n <= 14 ? 3 : 4;
     }
 
     // Get place fraction denominator (4 = 1/4, 5 = 1/5) from Bet365 data
