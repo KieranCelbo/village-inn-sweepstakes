@@ -1079,12 +1079,12 @@ const firebaseConfig = {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
             const _pts = calcPoints(race, pick.horseName);
-            const _ptsStr = _pts > 0 ? ` +${_pts}pts` : '';
+            const _ptsStr = _pts > 0 ? ` +€${_pts.toFixed(2)}` : _pts < 0 ? ` -€${Math.abs(_pts).toFixed(2)}` : '';
             if (horseMatch(pick.horseName,winner)) return `<span class="badge badge-gold">🏆 Won${_ptsStr}</span>`;
             if (places>=2&&horseMatch(pick.horseName,second)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed${_ptsStr}</span>`;
             if (places>=3&&horseMatch(pick.horseName,third))  return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed${_ptsStr}</span>`;
             if (places>=4&&horseMatch(pick.horseName,fourth)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed${_ptsStr}</span>`;
-            return '<span class="badge badge-red">❌ Lost</span>';
+            return `<span class="badge badge-red">❌ Lost${_ptsStr}</span>`;
           };
 
 

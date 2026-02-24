@@ -748,7 +748,7 @@ const firebaseConfig = {
             ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
             ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +€${pts.toFixed(2)}</span>` : ''}
             ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +€${pts.toFixed(2)}</span>` : ''}
-            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ ${esc(picked)}</span>` : ''}
+            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ Lost -€10.00</span>` : ''}
             ${pts !== 0 ? `<span class="points-badge ${pts<0?'lost-points':outcome==='place'?'place-points':''}">${pts<0?'-€'+Math.abs(pts).toFixed(2):'+€'+pts.toFixed(2)}</span>` : ''}
           </div>`;
       }
