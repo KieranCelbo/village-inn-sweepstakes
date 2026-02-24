@@ -146,6 +146,7 @@
           <div style="display:flex;gap:8px;">
             <button class="btn btn-outline btn-sm" id="refresh-odds-btn">📊 Refresh Odds</button>
             <button class="btn btn-secondary btn-sm" id="refresh-results-btn">🏆 Refresh Results</button>
+            <button class="btn btn-primary btn-sm" id="autopick-btn">🤖 Auto-Pick by Form</button>
             <button class="btn btn-outline btn-sm" id="clear-meeting-btn">✕ Clear</button>
           </div>
         </div>
@@ -235,6 +236,31 @@
     <div class="modal-footer">
       <button class="btn btn-outline btn-sm" id="cancel-result-btn">Cancel</button>
       <button class="btn btn-primary btn-sm" id="save-result-btn">Save Result</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- AUTO-PICK MODAL -->
+<div id="autopick-modal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-width:700px;width:95%;">
+    <div class="modal-header">
+      <h3>🤖 Form-Based Auto Picks</h3>
+      <button class="modal-close" id="close-autopick-btn">×</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div style="padding:12px 20px;background:var(--cream);border-bottom:1px solid var(--cream-dark);font-size:0.85rem;color:var(--text-muted);">
+        Best pick per race based on recent form. Most recent runs weighted highest. Non-runners excluded.
+      </div>
+      <div id="autopick-results" style="max-height:60vh;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:12px;align-items:stretch;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-weight:600;font-size:0.9rem;">Assign picks to:</label>
+        <select id="autopick-user-select" class="form-select" style="flex:1;min-width:160px;"></select>
+        <button class="btn btn-primary btn-sm" id="apply-autopick-btn">✅ Apply Picks</button>
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">Only applies to unlocked races with no existing pick from this user.</div>
     </div>
   </div>
 </div>
@@ -1247,6 +1273,162 @@ const firebaseConfig = {
     showToast('Override applied','success');
     document.getElementById('override-modal').style.display='none';
     await loadRaces(); loadResults(); loadLeaderboard(); updateStats();
+  });
+
+  // ===== AUTO-PICK BY FORM =====
+
+  // Score a form string — reads right to left (most recent first)
+  // Returns numeric score: higher = better recent form
+  function scoreForm(formStr) {
+    if (!formStr) return -1;
+    // Extract only meaningful characters: 1-9, 0(=10th+), P F U R (bad)
+    const chars = String(formStr).replace(/[-\/\s]/g, '').split('').reverse(); // most recent first
+    const bad = new Set(['P','F','U','R','p','f','u','r']);
+    let score = 0;
+    const weights = [10, 7, 5, 3, 2, 1]; // recent runs worth more
+    chars.slice(0, 6).forEach((c, i) => {
+      const w = weights[i] || 1;
+      if (bad.has(c))        score += w * -2;  // falls/PU = very bad
+      else if (c === '0')    score += w * 0;   // 10th+ = neutral
+      else {
+        const pos = parseInt(c);
+        if (pos === 1)       score += w * 10;  // win = best
+        else if (pos === 2)  score += w * 7;
+        else if (pos === 3)  score += w * 5;
+        else if (pos <= 5)   score += w * 2;
+        else                 score += w * -1;  // 6th-9th = slightly bad
+      }
+    });
+    return score;
+  }
+
+  document.getElementById('autopick-btn').addEventListener('click', async () => {
+    if (!activeMeeting || !allRaces.length) {
+      showToast('Load a meeting first', 'error'); return;
+    }
+
+    // Populate user dropdown
+    const userSel = document.getElementById('autopick-user-select');
+    userSel.innerHTML = allUsers
+      .filter(u => u.role === 'user' || u.role === 'player')
+      .map(u => `<option value="${u.id}">${esc(u.displayName || u.username)}</option>`)
+      .join('');
+    if (!userSel.options.length) {
+      showToast('No players found', 'error'); return;
+    }
+
+    // Analyse each race
+    const recommendations = allRaces
+      .filter(r => !r.result)  // skip races with results already
+      .map(race => {
+        const runners = (race.runners || []).filter(r => !r.nr);
+        if (!runners.length) return null;
+
+        // Score each runner by form
+        const scored = runners.map(r => ({
+          ...r,
+          formScore: scoreForm(r.form)
+        })).sort((a, b) => b.formScore - a.formScore);
+
+        const pick = scored[0];
+        const second = scored[1];
+
+        return { race, pick, second, allScored: scored };
+      })
+      .filter(Boolean);
+
+    // Render results
+    const el = document.getElementById('autopick-results');
+    if (!recommendations.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">All races have results recorded — nothing to pick.</div>';
+    } else {
+      el.innerHTML = recommendations.map(({ race, pick, second, allScored }) => {
+        const formBar = allScored.slice(0, 4).map(r =>
+          `<span style="font-size:0.75rem;padding:2px 6px;border-radius:10px;background:var(--cream-dark);color:var(--text-dark);">
+            ${esc(r.name)} <span style="color:var(--text-muted);">${r.form||'—'}</span>
+            <span style="color:var(--green);font-weight:700;">(${r.formScore})</span>
+          </span>`
+        ).join(' ');
+
+        const isLocked = isRaceLocked(race);
+        return `
+          <div style="padding:14px 20px;border-bottom:1px solid var(--cream-dark);${isLocked?'opacity:0.6;':''}" data-race-id="${race.id}" data-pick="${esc(pick.name)}">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+              <span style="background:var(--green);color:white;padding:3px 10px;border-radius:8px;font-weight:700;font-size:0.9rem;">${race.time}</span>
+              <span style="font-weight:700;">${esc(race.name)}</span>
+              ${isLocked ? '<span style="font-size:0.75rem;background:var(--red);color:white;padding:2px 8px;border-radius:8px;">🔒 Locked</span>' : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+              <div>
+                <div style="font-size:0.8rem;color:var(--text-muted);">Top pick</div>
+                <div style="font-weight:700;font-size:1.05rem;color:var(--green);">
+                  🐴 ${esc(pick.name)}
+                  ${pick.odds ? `<span style="color:var(--gold-dark);font-size:0.85rem;">${pick.odds}</span>` : ''}
+                  <span style="font-size:0.8rem;color:var(--text-muted);">Form: ${pick.form||'—'}</span>
+                  <span style="font-size:0.78rem;font-weight:400;background:rgba(27,77,46,0.1);padding:1px 6px;border-radius:8px;">score: ${pick.formScore}</span>
+                </div>
+              </div>
+              ${second ? `<div style="font-size:0.82rem;color:var(--text-muted);">2nd: ${esc(second.name)} (${second.form||'—'}) score:${second.formScore}</div>` : ''}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${formBar}</div>
+          </div>`;
+      }).join('');
+    }
+
+    document.getElementById('autopick-modal').style.display = 'flex';
+  });
+
+  document.getElementById('close-autopick-btn').addEventListener('click',
+    () => document.getElementById('autopick-modal').style.display = 'none');
+
+  document.getElementById('apply-autopick-btn').addEventListener('click', async () => {
+    const userId = document.getElementById('autopick-user-select').value;
+    const userName = document.getElementById('autopick-user-select').selectedOptions[0]?.text || 'User';
+    if (!userId) { showToast('Select a user first', 'error'); return; }
+
+    const btn = document.getElementById('apply-autopick-btn');
+    btn.disabled = true; btn.textContent = '⏳ Applying…';
+
+    try {
+      // Get existing picks for this user
+      const existingSnap = await getDocs(query(collection(db,'picks'), where('userId','==',userId)));
+      const existingRaceIds = new Set(existingSnap.docs.map(d => d.data().raceId));
+
+      const rows = document.querySelectorAll('#autopick-results [data-race-id]');
+      let applied = 0, skipped = 0;
+
+      for (const row of rows) {
+        const raceId   = row.dataset.raceId;
+        const horseName = row.dataset.pick;
+        const race = allRaces.find(r => r.id === raceId);
+        if (!race) continue;
+
+        // Skip locked races
+        if (isRaceLocked(race)) { skipped++; continue; }
+
+        // Skip if user already has a pick for this race
+        if (existingRaceIds.has(raceId)) { skipped++; continue; }
+
+        // Write the pick
+        const pickId = `${userId}-${raceId}`;
+        await setDoc(doc(db, 'picks', pickId), {
+          userId,
+          raceId,
+          horseName,
+          date: race.date,
+          pickedAt: new Date().toISOString(),
+          source: 'auto-form'
+        });
+        applied++;
+      }
+
+      showToast(`✅ ${applied} pick(s) applied for ${userName}${skipped ? ` (${skipped} skipped — locked or already picked)` : ''}`, 'success');
+      btn.textContent = `✅ Done — ${applied} applied`;
+      updateStats();
+    } catch(err) {
+      showToast('❌ ' + err.message, 'error');
+      btn.disabled = false; btn.textContent = '✅ Apply Picks';
+    }
   });
 
   // ===== LEADERBOARD =====
