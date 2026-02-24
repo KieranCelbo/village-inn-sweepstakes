@@ -473,7 +473,7 @@
       </div>
       <div class="summary-stat">
         <div class="summary-num" id="summary-points">0</div>
-        <div class="summary-label">My Points</div>
+        <div class="summary-label">My Returns</div>
       </div>
       <div class="summary-stat">
         <div class="summary-num" id="summary-open">—</div>
@@ -492,9 +492,9 @@
     <div class="user-tab-panel active" id="utab-races">
       <!-- Scoring key -->
       <div class="scoring-info">
-        <strong>📊 How points work:</strong>
+        <strong>📊 How it works:</strong>
         <div class="scoring-grid">
-          <div class="scoring-rule"><span class="scoring-pts">5pts</span> Placed per pick each way</div>
+          <div class="scoring-rule"><span class="scoring-pts">€5 E/W</span> €5 win + €5 place per pick</div>
         </div>
       </div>
       <div id="races-container">
@@ -589,24 +589,27 @@ const firebaseConfig = {
       return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
     }
 
+    // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
     function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
       const places = getRacePlaces(race);
       const { winner, second, third, fourth, fifth } = race.result;
-      const STAKE = 10;
-
-      // Find this horse's odds
-      const runner = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-      const oddsDecimal = parseOdds(runner?.odds);
-      const ewDenom = getEwDenom(race);
-
-      const PLACE_STAKE = STAKE / 2;  // Each-way: 10pt stake = 5pt win + 5pt place
-      if (horseMatch(horseName, winner))                return Math.round((oddsDecimal + 1) * STAKE);
-      if (places >= 2 && horseMatch(horseName, second)) return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
-      if (places >= 3 && horseMatch(horseName, third))  return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
-      if (places >= 4 && horseMatch(horseName, fourth)) return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
-      if (places >= 5 && horseMatch(horseName, fifth))  return Math.round((oddsDecimal / ewDenom + 1) * PLACE_STAKE);
-
+      const runner    = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+      const od        = parseOdds(runner?.odds);  // e.g. 10.0 for 10/1
+      const ewDenom   = getEwDenom(race);          // 4 = 1/4 odds, 5 = 1/5 odds
+      const WIN_STAKE   = 5;  // €5 on win
+      const PLACE_STAKE = 5;  // €5 on place
+      if (horseMatch(horseName, winner)) {
+        const winReturn   = (od + 1) * WIN_STAKE;
+        const placeReturn = ((od / ewDenom) + 1) * PLACE_STAKE;
+        return Math.round((winReturn + placeReturn) * 100) / 100;
+      }
+      const placed =
+        (places >= 2 && horseMatch(horseName, second)) ||
+        (places >= 3 && horseMatch(horseName, third))  ||
+        (places >= 4 && horseMatch(horseName, fourth)) ||
+        (places >= 5 && horseMatch(horseName, fifth));
+      if (placed) return Math.round(((od / ewDenom) + 1) * PLACE_STAKE * 100) / 100;
       return 0;
     }
 
@@ -737,10 +740,10 @@ const firebaseConfig = {
             <span>🏆</span>
             <span class="winner-label">${esc(race.result.winner)}</span>
             ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
-            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +10pts</span>` : ''}
-            ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +5pts</span>` : ''}
+            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +€${pts.toFixed(2)}</span>` : ''}
+            ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +€${pts.toFixed(2)}</span>` : ''}
             ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ ${esc(picked)}</span>` : ''}
-            ${pts > 0 ? `<span class="points-badge ${outcome==='place'?'place-points':''}">${pts} pts</span>` : ''}
+            ${pts > 0 ? `<span class="points-badge ${outcome==='place'?'place-points':''}">€${pts.toFixed(2)}</span>` : ''}
           </div>`;
       }
 
@@ -771,7 +774,7 @@ const firebaseConfig = {
 
                     return (_odds
                       ? `<div class="horse-odds">${_odds}</div>
-                         <div class="horse-potential">Win: +${_winPts}pts · Place: +${_placePts}pts</div>`
+                         <div class="horse-potential">Win: €${((od+1)*5).toFixed(2)} · Place: €${((od/ewDenom+1)*5).toFixed(2)}</div>`
                       : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
                       + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
                   })()}
@@ -874,7 +877,7 @@ const firebaseConfig = {
                 <div class="picks-day-title">${dateLabel}</div>
                 ${venue ? `<div class="picks-day-venue">🏟️ ${esc(venue)}</div>` : ''}
               </div>
-              ${dayPoints > 0 ? `<div class="picks-day-points">+${dayPoints} pts</div>` : ''}
+              ${dayPoints > 0 ? `<div class="picks-day-points">+€${dayPoints.toFixed(2)}</div>` : ''}
             </div>
             ${items.map(({ pick, race }) => {
               if (!race) return '';
@@ -901,7 +904,7 @@ const firebaseConfig = {
                     <div class="pick-race">${esc(race.name)}</div>
                   </div>
                   ${badgeHtml}
-                  ${pts > 0 ? `<div class="pick-points ${outcome==='place'?'place-pts':''}">+${pts}pts</div>` : ''}
+                  ${pts > 0 ? `<div class="pick-points ${outcome==='place'?'place-pts':''}">+€${pts.toFixed(2)}</div>` : ''}
                 </div>`;
             }).join('')}
           </div>`;
@@ -966,7 +969,7 @@ const firebaseConfig = {
 
       document.getElementById('summary-races').textContent  = allRaces.length;
       document.getElementById('summary-picked').textContent = picked;
-      document.getElementById('summary-points').textContent = points;
+      document.getElementById('summary-points').textContent = '€' + points.toFixed(2);
       document.getElementById('summary-open').textContent   = open;
     }
 
@@ -1022,8 +1025,8 @@ const firebaseConfig = {
               <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">${s.pts}</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">points</div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">€${s.pts.toFixed(2)}</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">returned</div>
             </div>
           </div>`).join('');
       } catch(err) {
