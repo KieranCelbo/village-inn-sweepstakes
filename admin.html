@@ -500,13 +500,18 @@ const firebaseConfig = {
     try {
       const picksSnap = await getDocs(collection(db,'picks'));
       const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
-      const raceIds = [...new Set(picks.map(p=>p.raceId))];
+      // Fetch ALL races from Firestore in one query (covers all festival days)
       const racesCache = {};
-      allRaces.forEach(r=>{ racesCache[r.id]=r; });
-      // Fetch any races not in current allRaces (previous festival days)
-      await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
-        try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
-      }));
+      try {
+        const allRacesSnap = await getDocs(collection(db,'races'));
+        allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
+      } catch(e) {
+        allRaces.forEach(r=>{ racesCache[r.id]=r; });
+        const raceIds=[...new Set(picks.map(p=>p.raceId))];
+        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
+        }));
+      }
 
       const scores = {};
       allUsers.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
@@ -1449,13 +1454,19 @@ const firebaseConfig = {
       u2.docs.forEach(d=>{ if(!users.find(u=>u.id===d.id)) users.push({id:d.id,...d.data()}); });
     } catch(e){}
 
-    // Fetch all races referenced by picks
-    const raceIds=[...new Set(picks.map(p=>p.raceId))];
+    // Fetch ALL races from Firestore in one query (covers all festival days)
     const racesCache={};
-    allRaces.forEach(r=>{ racesCache[r.id]=r; });
-    await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
-      try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e){}
-    }));
+    try {
+      const allRacesSnap = await getDocs(collection(db,'races'));
+      allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
+    } catch(e) {
+      // Fallback: use allRaces + fetch individually
+      allRaces.forEach(r=>{ racesCache[r.id]=r; });
+      const raceIds=[...new Set(picks.map(p=>p.raceId))];
+      await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+        try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
+      }));
+    }
 
     const scores={};
     users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
