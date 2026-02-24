@@ -1109,7 +1109,7 @@ const firebaseConfig = {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong></td>
+                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()}</td>
                       <td>${outcomeLabel(pick)}</td>
                     </tr>`;
                   }).join('')}
