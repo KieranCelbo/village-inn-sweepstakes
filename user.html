@@ -778,7 +778,7 @@ const firebaseConfig = {
 
                     return (_odds
                       ? `<div class="horse-odds">${_odds}</div>
-                         <div class="horse-potential">Win: €${((od+1)*5).toFixed(2)} · Place: €${((od/ewDenom+1)*5).toFixed(2)}</div>`
+                         <div class="horse-potential">Win: €${((_od+1)*5).toFixed(2)} · Place: €${((_od/ewDenom+1)*5).toFixed(2)}</div>`
                       : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
                       + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
                   })()}
