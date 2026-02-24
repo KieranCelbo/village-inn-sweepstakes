@@ -315,10 +315,10 @@ const firebaseConfig = {
     return race.extraPlace ? base + 1 : base;
   }
 
-  // Get place fraction denominator from Bet365 data (4 = 1/4, 5 = 1/5)
+  // Use Bet365 stored ew_denom (4 = 1/4 odds, 5 = 1/5 odds), fall back to 4
   function getEwDenom(race) {
-    const runnerWithEw = (race.runners||[]).find(r => r.ew_denom > 0);
-    return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
+    const r = (race.runners||[]).find(r => r.ew_denom > 0);
+    return r ? r.ew_denom : 4;
   }
 
   // Calculate euro return for a €5 each-way pick (€5 win + €5 place)

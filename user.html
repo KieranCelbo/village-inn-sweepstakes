@@ -589,9 +589,10 @@ const firebaseConfig = {
     }
 
     // Get place fraction denominator (4 = 1/4, 5 = 1/5) from Bet365 data
+    // Use Bet365 stored ew_denom (4 = 1/4 odds, 5 = 1/5 odds), fall back to 4
     function getEwDenom(race) {
-      const runnerWithEw = (race.runners||[]).find(r => r.ew_denom > 0);
-      return runnerWithEw ? (runnerWithEw.ew_denom || 4) : 4;
+      const r = (race.runners||[]).find(r => r.ew_denom > 0);
+      return r ? r.ew_denom : 4;
     }
 
     // €5 each-way: €5 win + €5 place. Returns full payout, partial payout, or -€10 for loss.
@@ -778,7 +779,7 @@ const firebaseConfig = {
 
                     return (_odds
                       ? `<div class="horse-odds">${_odds}</div>
-                         <div class="horse-potential">Win: €${((_od+1)*5).toFixed(2)} · Place: €${((_od/ewDenom+1)*5).toFixed(2)}</div>`
+                         <div class="horse-potential">Win: €${(((_od+1)*5)+((_od/ewDenom+1)*5)).toFixed(2)} · Place: €${((_od/ewDenom+1)*5).toFixed(2)}</div>`
                       : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
                       + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
                   })()}
