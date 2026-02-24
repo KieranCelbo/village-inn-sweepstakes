@@ -495,8 +495,8 @@ const firebaseConfig = {
         const n = (race.runners||[]).length;
         const {winner,second,third,fourth,fifth} = race.result;
         const _pts = calcPoints(race, p.horseName);
+        scores[p.userId].pts += _pts;
         if (_pts > 0) {
-          scores[p.userId].pts += _pts;
           if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
           else scores[p.userId].places++;
         }
@@ -1287,8 +1287,8 @@ const firebaseConfig = {
       if (!race||!race.result) continue;
       const {winner,second,third,fourth,fifth}=race.result;
       const _pts = calcPoints(race, p.horseName);
+      scores[p.userId].pts += _pts;
       if (_pts > 0) {
-        scores[p.userId].pts += _pts;
         if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
         else scores[p.userId].places++;
       }
