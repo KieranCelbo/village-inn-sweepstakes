@@ -94,8 +94,10 @@ function setCORS(res) {
 // IMPORTANT: field is off_time (ISO datetime), horse field is "horse"
 async function handleRacecards(req, res, params) {
   const day = params.day || 'today';
-  console.log(`  -> GET /v1/racecards/standard (day hint: ${day})`);
-  const r = await racingAPI('/racecards/standard');
+  // Racing API Standard supports ?day=tomorrow to get next day's racecards
+  const path = day === 'tomorrow' ? '/racecards/standard?day=tomorrow' : '/racecards/standard';
+  console.log(`  -> GET /v1${path}`);
+  const r = await racingAPI(path);
   res.writeHead(r.status, {'Content-Type':'application/json'});
   res.end(JSON.stringify(r.data));
 }
@@ -139,8 +141,10 @@ async function handleOdds(req, res, params) {
     return;
   }
 
-  console.log(`  -> Odds for "${venue}"`);
-  const r = await racingAPI('/racecards/standard');
+  const day = (params.day || 'today');
+  const racecardsPath = day === 'tomorrow' ? '/racecards/standard?day=tomorrow' : '/racecards/standard';
+  console.log(`  -> Odds for "${venue}" (${day})`);
+  const r = await racingAPI(racecardsPath);
 
   if (r.status !== 200) {
     res.writeHead(r.status, {'Content-Type':'application/json'});
