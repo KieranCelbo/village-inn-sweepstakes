@@ -3,542 +3,276 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Picks — The Village Inn Sweepstakes</title>
+  <title>Admin Dashboard — The Village Inn Sweepstakes</title>
   <link rel="stylesheet" href="styles.css">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* ===== PAGE HEADER ===== */
     .page-header {
       background: linear-gradient(135deg, var(--green) 0%, var(--green-mid) 100%);
-      color: white;
-      padding: 24px 28px;
-      margin-bottom: 24px;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 16px;
+      color: white; padding: 28px; margin-bottom: 28px;
+      border-radius: var(--radius-lg); box-shadow: var(--shadow);
     }
-    .page-header h2 { color: var(--gold-light); font-size: 1.6rem; margin: 0; }
-    .page-header p { color: rgba(255,255,255,0.7); margin-top: 4px; font-size: 0.9rem; }
+    .page-header h2 { color: var(--gold-light); font-size: 1.8rem; }
+    .page-header p { color: rgba(255,255,255,0.7); margin-top: 4px; }
+    .meeting-card {
+      border: 2px solid var(--cream-dark); border-radius: 12px;
+      padding: 16px 18px; cursor: pointer; transition: all 0.2s; background: var(--white);
+    }
+    .meeting-card:hover { border-color: var(--gold); background: rgba(201,168,76,0.06); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(201,168,76,0.2); }
+    .meeting-card.meeting-active { border-color: var(--green); background: rgba(27,77,46,0.06); }
+    .meeting-venue { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+    .meeting-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+    .meeting-load-btn { font-size: 0.85rem; font-weight: 700; color: var(--gold-dark); }
+    .meeting-loaded-tag { font-size: 0.85rem; font-weight: 700; color: var(--green); }
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .user-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; color: var(--dark); flex-shrink: 0; }
+    .user-name { font-weight: 700; font-size: 1rem; }
+    .override-badge { font-size: 0.7rem; background: rgba(192,57,43,0.15); color: var(--red); padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+    #active-meeting-banner { display:none; }
+    #active-meeting-banner.visible { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    #day-today-btn.active, #day-tomorrow-btn.active,
+    #day-today-btn.day-active, #day-tomorrow-btn.day-active { background: var(--green) !important; color: white !important; border-color: var(--green) !important; }
 
-    .meeting-badge {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 10px 18px;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      text-align: center;
-      line-height: 1.4;
-    }
-    .meeting-badge .meeting-venue { font-size: 1.1rem; color: var(--gold-light); }
-    .meeting-badge .meeting-date { font-size: 0.8rem; opacity: 0.8; margin-top: 2px; }
-
-    /* ===== TABS ===== */
-    .user-tabs {
-      display: flex;
-      gap: 4px;
-      background: var(--cream-dark);
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 24px;
-    }
-    .user-tab-btn {
-      flex: 1;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 9px;
-      background: transparent;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-    }
-    .user-tab-btn.active {
-      background: var(--white);
-      color: var(--green);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .user-tab-panel { display: none; }
-    .user-tab-panel.active { display: block; }
-
-    /* ===== SUMMARY STRIP ===== */
-    .picks-summary {
-      background: var(--green);
-      color: white;
-      border-radius: var(--radius-lg);
-      padding: 18px 24px;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 24px;
-      box-shadow: var(--shadow);
-    }
-    @media(max-width:600px){ .picks-summary { grid-template-columns: repeat(2,1fr); } }
-    .summary-stat { text-align: center; padding: 4px; }
-    .summary-num {
-      font-family: 'Playfair Display', serif;
-      font-size: 2rem;
-      font-weight: 900;
-      color: var(--gold-light);
-      line-height: 1;
-    }
-    .summary-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      opacity: 0.7;
-      margin-top: 4px;
-    }
-
-    /* ===== RACE CARD ===== */
-    .race-card {
-      background: var(--white);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      margin-bottom: 20px;
-      overflow: hidden;
-      transition: box-shadow 0.2s;
-    }
-    .race-card:hover { box-shadow: var(--shadow-lg); }
-
-    .race-card-header {
-      padding: 16px 22px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px;
-      border-bottom: 2px solid var(--cream-dark);
-    }
-    .race-card-header.locked {
-      background: #faf5f5;
-      border-bottom-color: #f0d0d0;
-    }
-    .race-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-
-    .race-time {
-      background: var(--green);
-      color: white;
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-family: 'Playfair Display', serif;
-      font-size: 1.25rem;
-      font-weight: 700;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .race-time.locked-time { background: #b0b0b0; }
-
-    .race-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--green);
-      line-height: 1.3;
-    }
-    .race-info { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; }
-
-    .race-status-area { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .countdown { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
-    .countdown.urgent { color: var(--red); }
-
-    .picked-badge {
-      background: var(--green);
-      color: white;
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 700;
-    }
-
-    /* ===== HORSE GRID ===== */
-    .horses-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 10px;
-      padding: 16px 20px;
-    }
-    @media(max-width:600px) {
-      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
-    }
-
-    .horse-card {
-      border: 2px solid var(--cream-dark);
-      border-radius: 11px;
-      padding: 12px 14px;
-      cursor: pointer;
-      transition: all 0.18s;
-      position: relative;
-      background: var(--white);
-      user-select: none;
-    }
-    .horse-card:hover:not(.locked-card):not(.picked) {
-      border-color: var(--gold);
-      background: rgba(201,168,76,0.05);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 14px rgba(201,168,76,0.18);
-    }
-    .horse-card.picked {
-      border-color: var(--green);
-      background: rgba(27,77,46,0.05);
-      box-shadow: 0 0 0 3px rgba(27,77,46,0.12);
-    }
-    .horse-card.locked-card { cursor: default; opacity: 0.7; }
-    .horse-card.nr-card { opacity: 0.5; cursor: default; }
-
-    .horse-number {
-      position: absolute;
-      top: 9px; right: 10px;
-      width: 24px; height: 24px;
-      background: var(--cream-dark);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
-    }
-    .horse-check {
-      position: absolute;
-      top: -7px; left: -7px;
-      width: 24px; height: 24px;
-      background: var(--green);
-      border-radius: 50%;
-      display: none;
-      align-items: center; justify-content: center;
-      color: white; font-size: 0.85rem;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    .horse-card.picked .horse-check { display: flex; }
-
-    .horse-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-right: 28px;
-      line-height: 1.2;
-    }
-    .horse-card.picked .horse-name { color: var(--green); }
-
-    .horse-odds {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: var(--gold-dark);
-      margin: 5px 0 3px;
-      font-family: 'Playfair Display', serif;
-    }
-    .horse-nr { font-size: 0.78rem; color: var(--red); font-weight: 700; margin: 4px 0; }
-    .horse-potential {
-      font-size: 0.68rem; color: var(--green); font-weight: 600;
-      margin-bottom: 3px; line-height: 1.3;
-    }
-    .horse-form {
-      font-size: 0.7rem; color: var(--text-muted); font-weight: 600;
-      margin: 2px 0 4px; letter-spacing: 0.04em;
-    }
-
-    .horse-details {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    /* ===== LOCKED STATE ===== */
-    .race-locked-msg {
-      padding: 16px 22px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: #9b4040;
-      font-weight: 600;
-      font-size: 0.95rem;
-      background: rgba(192,57,43,0.04);
-    }
-
-    /* ===== RESULT BAR ===== */
-    .race-result-bar {
-      padding: 12px 22px;
-      background: rgba(201,168,76,0.1);
-      border-top: 1px solid rgba(201,168,76,0.2);
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-      font-size: 0.88rem;
-    }
-    .winner-label { font-weight: 700; color: var(--green); }
-    .place-label { color: var(--text-muted); }
-    .pick-outcome-win { color: var(--green); font-weight: 700; }
-    .pick-outcome-place { color: #c08000; font-weight: 700; }
-    .pick-outcome-lose { color: var(--red); font-weight: 600; }
-
-    .points-badge {
-      margin-left: auto;
-      background: var(--green);
-      color: white;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-    .points-badge.place-points { background: #c08000; }
-
-    /* ===== BET MODAL ===== */
-    #bet-ew-btn:hover  { border-color: var(--green) !important; background: rgba(27,77,46,0.05) !important; }
-    #bet-win-btn:hover { border-color: var(--gold-dark) !important; background: rgba(201,168,76,0.05) !important; }
-    #bet-ew-btn:active, #bet-win-btn:active { transform: scale(0.97); }
-
-    /* ===== MY PICKS TAB ===== */
-    .picks-day-group {
-      background: var(--white);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      margin-bottom: 20px;
-      overflow: hidden;
-    }
-    .picks-day-header {
-      background: var(--green);
-      color: white;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .picks-day-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--gold-light); }
-    .picks-day-points { font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; }
-    .picks-day-venue { font-size: 0.8rem; opacity: 0.75; margin-top: 1px; }
-
-    .pick-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 12px 20px;
-      border-bottom: 1px solid var(--cream-dark);
-      font-size: 0.88rem;
-    }
-    .pick-row:last-child { border-bottom: none; }
-    .pick-time {
-      background: var(--cream-dark);
-      color: var(--text-muted);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 0.82rem;
-      flex-shrink: 0;
-    }
-    .pick-horse { font-weight: 700; color: var(--text); font-family: 'Playfair Display', serif; }
-    .pick-race { color: var(--text-muted); font-size: 0.78rem; flex: 1; }
-    .pick-result-badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .badge-win { background: rgba(27,77,46,0.12); color: var(--green); }
-    .badge-place { background: rgba(192,128,0,0.12); color: #c08000; }
-    .badge-lose { background: rgba(192,57,43,0.1); color: var(--red); }
-    .badge-pending { background: var(--cream-dark); color: var(--text-muted); }
-    .badge-no-pick { background: var(--cream-dark); color: var(--text-muted); font-style: italic; }
-
-    .pick-points { font-weight: 700; color: var(--green); font-size: 0.85rem; flex-shrink: 0; }
-    .pick-points.place-pts { color: #c08000; }
-    .pick-points.lost-pts  { color: var(--red); }
-    .points-badge.lost-points { background: var(--red); }
-
-    .picks-empty {
-      padding: 40px 24px;
-      text-align: center;
-      color: var(--text-muted);
-    }
-    .picks-empty .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
-
-    /* ===== SCORING INFO ===== */
-    .scoring-info {
-      background: linear-gradient(135deg, rgba(27,77,46,0.06), rgba(201,168,76,0.06));
-      border: 1px solid rgba(201,168,76,0.2);
-      border-radius: 12px;
-      padding: 16px 20px;
-      margin-bottom: 24px;
-      font-size: 0.85rem;
-      color: var(--text);
-    }
-    .scoring-info strong { color: var(--green); }
-    .scoring-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
-    .scoring-rule { display: flex; align-items: center; gap: 8px; }
-    .scoring-pts { font-weight: 800; color: var(--gold-dark); font-family: 'Playfair Display', serif; font-size: 1rem; }
-
-    /* ===== USER MOBILE ===== */
+    /* ===== ADMIN MOBILE EXTRAS ===== */
     @media (max-width: 768px) {
-      .page-header { padding: 16px 18px; border-radius: 14px; }
-      .page-header h2 { font-size: 1.3rem; }
-      .meeting-badge { padding: 8px 14px; }
-      .meeting-badge .meeting-venue { font-size: 1rem; }
+      .race-actions { flex-direction: column; gap: 8px; }
+      .race-actions .btn { width: 100%; }
+      #active-meeting-banner { border-radius: 12px; }
 
-      .picks-summary { padding: 14px 16px; gap: 6px; }
-      .summary-num { font-size: 1.6rem; }
-      .summary-label { font-size: 0.7rem; }
+      /* Meeting controls row */
+      .meeting-controls {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .meeting-controls > * { width: 100%; justify-content: center; }
 
-      .user-tabs { margin-bottom: 16px; }
-      .user-tab-btn { padding: 9px 10px; font-size: 0.82rem; }
+      /* Results table picks column */
+      .picks-table-wrap { max-height: 200px; overflow-y: auto; }
 
-      .scoring-info { padding: 12px 14px; font-size: 0.8rem; }
-      .scoring-grid { gap: 10px; }
-
-      .race-card { border-radius: 14px; margin-bottom: 14px; }
-      .race-card-header { padding: 12px 14px; gap: 8px; }
-      .race-time { font-size: 1.1rem; padding: 6px 12px; }
-      .race-name { font-size: 0.95rem; }
-      .race-info { font-size: 0.75rem; }
-      .race-status-area { gap: 6px; }
-      .lock-badge { font-size: 0.78rem; padding: 4px 10px; }
-      .countdown { font-size: 0.75rem; }
-
-      .horses-grid { grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px; }
-      .horse-card { padding: 10px 12px; border-radius: 10px; }
-      .horse-name { font-size: 0.85rem; margin-right: 24px; }
-      .horse-odds { font-size: 1rem; }
-      .horse-details { font-size: 0.68rem; }
-      .horse-number { width: 22px; height: 22px; font-size: 0.68rem; }
-      .horse-check { width: 20px; height: 20px; font-size: 0.75rem; top: -6px; left: -6px; }
-
-      .race-result-bar { padding: 10px 14px; font-size: 0.82rem; gap: 8px; }
-      .race-locked-msg { padding: 12px 14px; font-size: 0.85rem; }
-
-      .picks-day-header { padding: 10px 14px; }
-      .picks-day-title { font-size: 1rem; }
-      .pick-row { padding: 10px 14px; gap: 10px; font-size: 0.82rem; }
-      .pick-time { font-size: 0.75rem; padding: 3px 8px; }
-      .pick-horse { font-size: 0.88rem; }
-      .pick-race { font-size: 0.72rem; }
+      /* User form */
+      .user-form-grid { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 420px) {
-      .horses-grid { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 10px; }
-      .horse-card { padding: 8px 10px; }
-      .horse-name { font-size: 0.8rem; }
-      .picks-summary { grid-template-columns: repeat(2, 1fr); }
-      .page-header { flex-direction: column; align-items: flex-start; }
-      .meeting-badge { width: 100%; }
-    }
-
-    /* Prevent iOS input zoom */
-    input, select, textarea { font-size: 16px !important; }
-
-    /* Better tap targets */
-    .horse-card { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-    .user-tab-btn { touch-action: manipulation; }
+    /* Make tabs obviously clickable everywhere */
+    .tab-btn { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.1); }
+    .tab-btn:active { opacity: 0.7; }
   </style>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="navbar-brand">
-      <div class="logo-icon">🏇</div>
-      <div>
-        <h1>The Village Inn Sweepstakes</h1>
-        <p id="user-welcome">Loading…</p>
-      </div>
-    </div>
-    <div class="nav-user">
-      <div class="nav-user-info">
-        <div class="name" id="user-name">—</div>
-        <div class="role">Player</div>
-      </div>
-      <button class="btn-logout" onclick="window.logout()">Sign Out</button>
-    </div>
-  </nav>
 
-  <div class="page-container">
-
-    <!-- Page Header -->
-    <div class="page-header">
-      <div>
-        <h2>🏁 Sweepstakes</h2>
-        <p>Pick one horse per race. Picks lock 30 minutes before the off.</p>
-      </div>
-      <div class="meeting-badge">
-        <div class="meeting-venue" id="meeting-venue-display">Loading…</div>
-        <div class="meeting-date" id="meeting-date-display">—</div>
-      </div>
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="logo-icon">🏇</div>
+    <div><h1>The Village Inn Sweepstakes</h1><p>Admin Dashboard</p></div>
+  </div>
+  <div class="nav-user">
+    <div class="nav-user-info">
+      <div class="name" id="admin-name">Admin</div>
+      <div class="role">Administrator</div>
     </div>
+    <button class="btn-logout" id="logout-btn">Sign Out</button>
+  </div>
+</nav>
 
-    <!-- Summary strip -->
-    <div class="picks-summary">
-      <div class="summary-stat">
-        <div class="summary-num" id="summary-races">—</div>
-        <div class="summary-label">Today's Races</div>
-      </div>
-      <div class="summary-stat">
-        <div class="summary-num" id="summary-picked">—</div>
-        <div class="summary-label">My Picks</div>
-      </div>
-      <div class="summary-stat">
-        <div class="summary-num" id="summary-points">0</div>
-        <div class="summary-label">My Returns</div>
-      </div>
-      <div class="summary-stat">
-        <div class="summary-num" id="summary-open">—</div>
-        <div class="summary-label">Open to Pick</div>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="user-tabs">
-      <button class="user-tab-btn active" data-utab="races">🏇 Today's Races</button>
-      <button class="user-tab-btn" data-utab="mypicks">📋 My Picks</button>
-      <button class="user-tab-btn" data-utab="leaderboard">🏆 Leaderboard</button>
-    </div>
-
-    <!-- TAB: Races -->
-    <div class="user-tab-panel active" id="utab-races">
-      <!-- Scoring key -->
-      <div class="scoring-info">
-        <strong>📊 How it works:</strong>
-        <div class="scoring-grid">
-          <div class="scoring-rule"><span class="scoring-pts">€5 E/W</span> €5 win + €5 place per pick</div>
-          <div class="scoring-rule"><span class="scoring-pts">Win</span> Full payout on both parts</div>
-          <div class="scoring-rule"><span class="scoring-pts">Place</span> Place part pays at 1/4 or 1/5 odds</div>
-          <div class="scoring-rule"><span class="scoring-pts" style="color:var(--red);">Lose</span> -€10 deducted</div>
-        </div>
-      </div>
-      <div id="races-container">
-        <div class="loading-center">
-          <div class="loading-spinner"></div>
-          <span style="font-size:1.1rem;">Loading races…</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: My Picks -->
-    <div class="user-tab-panel" id="utab-mypicks">
-      <div id="mypicks-container">
-        <div class="loading-center">
-          <div class="loading-spinner"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: Leaderboard -->
-    <div class="user-tab-panel" id="utab-leaderboard">
-      <div id="leaderboard-container">
-        <div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>
-      </div>
-    </div>
-
+<div class="page-container">
+  <div class="page-header">
+    <h2>🎯 Admin Control Panel</h2>
+    <p>Manage users, races, results and picks</p>
   </div>
 
-  <div id="toast-container"></div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-value" id="stat-users">—</div><div class="stat-label">Registered Players</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-races">—</div><div class="stat-label">Today's Races</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-picks">—</div><div class="stat-label">Total Picks Made</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-results">—</div><div class="stat-label">Results Recorded</div></div>
+  </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="users">👤 Users</button>
+    <button class="tab-btn" data-tab="races">🏁 Races</button>
+    <button class="tab-btn" data-tab="results">🏆 Results & Picks</button>
+    <button class="tab-btn" data-tab="leaderboard">📊 Leaderboard</button>
+  </div>
+
+  <!-- USERS TAB -->
+  <div id="tab-users" class="tab-panel active">
+    <div class="card">
+      <div class="card-header">
+        <div><h2>Players</h2><p>Add and manage sweepstakes participants</p></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" id="cleanup-picks-btn">🧹 Clean Orphaned Picks</button>
+          <button class="btn btn-primary btn-sm" id="add-player-btn">+ Add Player</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
+      </div>
+    </div>
+
+    <!-- Leaderboard on Users tab -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header">
+        <div><h2>🏆 Leaderboard</h2><p>Cumulative standings across all festival days</p></div>
+      </div>
+      <div class="card-body">
+        <div id="users-leaderboard"><div class="loading-center"><div class="loading-spinner"></div><span>Calculating…</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RACES TAB -->
+  <div id="tab-races" class="tab-panel">
+    <div class="card">
+      <div class="card-header">
+        <div><h2>Race Meetings</h2><p>Select a meeting to load races for players</p></div>
+        <span class="badge badge-green" id="races-tab-badge" style="display:none;"></span>
+      </div>
+      <div class="card-body">
+        <div style="background:var(--cream-dark);border-radius:var(--radius);padding:20px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-weight:700;">📅 Day:</span>
+            <button class="btn btn-sm day-active" id="day-today-btn">Today</button>
+            <button class="btn btn-outline btn-sm" id="day-tomorrow-btn">Tomorrow</button>
+            <button class="btn btn-primary btn-sm" id="browse-btn">🔍 Browse Meetings</button>
+            <span style="font-size:0.85rem;color:var(--text-muted);">Picks lock 30 mins before each race.</span>
+          </div>
+        </div>
+        <div id="meeting-picker" style="display:none;margin-bottom:20px;">
+          <div style="font-weight:700;margin-bottom:12px;font-size:1rem;">🏟️ Select a Meeting to Load:</div>
+          <div id="meeting-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;"></div>
+        </div>
+        <div id="active-meeting-banner" style="display:none;background:rgba(27,77,46,0.1);border:2px solid var(--green);border-radius:10px;padding:14px 18px;margin-bottom:16px;gap:10px;">
+          <div>
+            <strong style="font-size:1.05rem;color:var(--green);" id="active-meeting-name">—</strong>
+            <div style="font-size:0.85rem;color:var(--text-muted);" id="active-meeting-meta">—</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" id="refresh-odds-btn">📊 Refresh Odds</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-results-btn">🏆 Refresh Results</button>
+            <button class="btn btn-primary btn-sm" id="autopick-btn">🤖 Auto-Pick by Form</button>
+            <button class="btn btn-outline btn-sm" id="clear-meeting-btn">✕ Clear</button>
+          </div>
+        </div>
+        <div id="races-list">
+          <div class="empty-state"><div class="empty-icon">🏁</div><h3>No meeting selected</h3><p>Click "Browse Meetings" to pick a race meeting for your players</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS TAB -->
+  <div id="tab-results" class="tab-panel">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-body" style="padding:14px 20px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:var(--text-muted);font-size:0.9rem;">🔄 Auto-fetch from Racing API:</span>
+          <button class="btn btn-secondary btn-sm" id="fetch-past-results-btn">🏆 Fetch Today's Results</button>
+          <span style="font-size:0.8rem;color:var(--text-muted);">Fetches today's results automatically — use the manual result button on each race for older dates</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><h2>Results & Picks</h2><p>Record race winners and view player selections</p></div></div>
+      <div class="card-body"><div id="results-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD TAB -->
+  <div id="tab-leaderboard" class="tab-panel">
+    <div class="card">
+      <div class="card-header"><h2>🏆 Leaderboard</h2></div>
+      <div class="card-body"><div id="leaderboard-list"><div class="loading-center"><div class="loading-spinner"></div><span>Calculating…</span></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div id="user-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Add New Player</h3><button class="modal-close" id="close-user-modal-btn">×</button></div>
+    <div class="modal-body">
+      <div id="user-modal-error" class="alert alert-error" style="display:none;"></div>
+      <div class="form-group"><label class="form-label">Display Name</label><input type="text" id="user-display-name" class="form-input" placeholder="e.g. John Murphy"></div>
+      <div class="form-group"><label class="form-label">Username (for login)</label><input type="text" id="user-username" class="form-input" placeholder="e.g. john"></div>
+      <div class="form-group"><label class="form-label">Password</label><input type="password" id="user-password" class="form-input" placeholder="Min 6 characters"></div>
+      <div class="form-group"><label class="form-label">Role</label><select id="user-role" class="form-select"><option value="user">Player</option><option value="admin">Admin</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-user-btn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="save-user-btn">Save Player</button>
+    </div>
+  </div>
+</div>
+
+<!-- OVERRIDE MODAL -->
+<div id="override-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Override Pick</h3><button class="modal-close" id="close-override-btn">×</button></div>
+    <div class="modal-body">
+      <div id="override-info" style="background:var(--cream);padding:12px 16px;border-radius:8px;margin-bottom:16px;"></div>
+      <div class="form-group"><label class="form-label">Select Correct Horse</label><select id="override-horse" class="form-select"></select></div>
+      <div class="form-group"><label class="form-label">Reason</label><input type="text" id="override-reason" class="form-input" placeholder="e.g. Player requested change"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-override-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="save-override-btn">Apply Override</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div id="result-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-header"><h3>Record Race Result</h3><button class="modal-close" id="close-result-btn">×</button></div>
+    <div class="modal-body">
+      <div id="result-race-info" style="background:var(--cream);padding:12px 16px;border-radius:8px;margin-bottom:16px;"></div>
+      <div class="form-group"><label class="form-label">Winning Horse</label><select id="result-winner" class="form-select"></select></div>
+      <div class="form-group" id="result-second-group"><label class="form-label">2nd Place</label><select id="result-second" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-third-group"><label class="form-label">3rd Place</label><select id="result-third" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-fourth-group"><label class="form-label">4th Place</label><select id="result-fourth" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div class="form-group" id="result-fifth-group" style="display:none;"><label class="form-label">5th Place</label><select id="result-fifth" class="form-select"><option value="">— Not recorded —</option></select></div>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--cream);border-radius:8px;display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="result-extra-place" style="width:18px;height:18px;cursor:pointer;">
+        <label for="result-extra-place" style="cursor:pointer;font-size:0.9rem;">Add extra place <span style="color:var(--text-muted);font-size:0.82rem;">(admin discretion — adds one more paid place)</span></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" id="cancel-result-btn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="save-result-btn">Save Result</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- AUTO-PICK MODAL -->
+<div id="autopick-modal" class="modal-overlay" style="display:none;">
+  <div class="modal" style="max-width:700px;width:95%;">
+    <div class="modal-header">
+      <h3>🤖 Form-Based Auto Picks</h3>
+      <button class="modal-close" id="close-autopick-btn">×</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div style="padding:12px 20px;background:var(--cream);border-bottom:1px solid var(--cream-dark);font-size:0.85rem;color:var(--text-muted);">
+        Best pick per race based on recent form. Most recent runs weighted highest. Non-runners excluded.
+      </div>
+      <div id="autopick-results" style="max-height:60vh;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer" style="flex-direction:column;gap:12px;align-items:stretch;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-weight:600;font-size:0.9rem;">Assign picks to:</label>
+        <select id="autopick-user-select" class="form-select" style="flex:1;min-width:160px;"></select>
+        <button class="btn btn-primary btn-sm" id="apply-autopick-btn">✅ Apply Picks</button>
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">Only applies to unlocked races with no existing pick from this user.</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script type="module">
+  import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -548,663 +282,1240 @@ const firebaseConfig = {
   storageBucket: "cheltenham-sweepstakes.firebasestorage.app",
   messagingSenderId: "311500302338",
   appId: "1:311500302338:web:aa0d9034d20708690e9f1b"
-    };
+};
 
-    const app  = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-    let currentUser  = null;
-    let allRaces     = [];
-    let myPicks      = {};   // raceId -> pick doc
-    let allMyPicks   = [];   // all picks across all dates for My Picks tab
-    let activeMeetingData = null;
+  // Requests go through local proxy (proxy.js) to avoid CORS issues
+  // ================================================================
+  //  PROXY URL — change this when you deploy the proxy to Railway
+  //  Local:   'http://localhost:3001'
+  //  Railway: 'https://your-proxy-name.railway.app'
+  // ================================================================
+  const PROXY_BASE     = 'https://168.119.226.96.nip.io';
+  const RACING_API_BASE = PROXY_BASE + '/api';
+  const RACING_HEADERS = {}; // Auth handled by proxy
 
-    // ===== SCORING =====
-    function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
-    function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+  let currentUser = null;
+  let allUsers = [];
+  let allRaces = [];
+  let selectedDay = 'today';
+  let activeMeeting = null;
+  let overrideContext = null;
+  let resultContext = null;
 
-    // 1-7 runners: winner + 1 place | 8-14: winner + 2 places | 15+: winner + 3 places
-    // extraPlace: admin adds 1 extra paid place for a specific race
-    function getPlaceCount(numRunners, extraPlace) {
-      const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
-      return extraPlace ? base + 1 : base;
+  // ===== UTILS =====
+  const esc = str => String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // Strip country suffix e.g. (IRE),(GB),(FR) before comparing horse names
+  function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+  function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
+  // Strip country suffix from venue names e.g. "Fairyhouse (IRE)" → "fairyhouse"
+  function normVenue(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+  function venueMatch(a,b) { return normVenue(a)===normVenue(b); }
+
+  // Place rules: 1-7 = 2 paid places (W+1), 8-14 = 3 paid places (W+2), 15+ = 4 paid places (W+3)
+  // extraPlace flag allows admin to add one extra place to any race
+  function getPlaces(numRunners, extraPlace) {
+    const base = numRunners <= 7 ? 2 : numRunners <= 14 ? 3 : 4;
+    return extraPlace ? base + 1 : base;
+  }
+
+  // Parse fractional odds "5/1" → 5.0
+  function parseOdds(oddsStr) {
+    if (!oddsStr || oddsStr === 'SP' || oddsStr === '') return 1.0;
+    const s = String(oddsStr).trim().toLowerCase();
+    if (s === 'evs' || s === 'evens' || s === '1/1') return 1.0;
+    const frac = s.match(/^(\d+)\/(\d+)$/);
+    if (frac) { const n = parseFloat(frac[1]), d = parseFloat(frac[2]); if (d > 0) return n / d; }
+    const dec = parseFloat(s);
+    if (!isNaN(dec) && dec > 0) return dec >= 2 ? dec - 1 : dec;
+    return 1.0;
+  }
+
+  // Use Bet365 ew_places directly — already includes any extra places they offer
+  function getRacePlaces(race) {
+    const n = (race.runners||[]).length;
+    const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
+    if (runnerWithEw) return runnerWithEw.ew_places;
+    // Fallback if no Bet365 data: standard rules
+    return n <= 7 ? 2 : n <= 14 ? 3 : 4;
+  }
+
+  // Use Bet365 stored ew_denom (4 = 1/4 odds, 5 = 1/5 odds), fall back to 4
+  function getEwDenom(race) {
+    const r = (race.runners||[]).find(r => r.ew_denom > 0);
+    return r ? r.ew_denom : 4;
+  }
+
+  // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
+  // Returns positive (win/place payout), negative (lost = -€10), or 0 (no result yet)
+  // Calculate net profit/loss. betType: 'ew' = €5/€5, 'win' = €10 win only
+  function calcPoints(race, horseName, betType = 'ew') {
+    if (!race.result || !horseName) return 0;
+    const places  = getRacePlaces(race);
+    const { winner, second, third, fourth, fifth } = race.result;
+    const runner  = (race.runners||[]).find(r => horseMatch(r.name, horseName));
+    const od      = parseOdds(runner?.odds);
+    const ewDenom = getEwDenom(race);
+    const STAKE   = 10;
+
+    const isWinner = horseMatch(horseName, winner);
+    const isPlaced =
+      (places >= 2 && horseMatch(horseName, second)) ||
+      (places >= 3 && horseMatch(horseName, third))  ||
+      (places >= 4 && horseMatch(horseName, fourth)) ||
+      (places >= 5 && horseMatch(horseName, fifth));
+
+    if (betType === 'win') {
+      if (isWinner) return Math.round(((od+1)*STAKE - STAKE) * 100) / 100;
+      return -STAKE;
+    } else {
+      if (isWinner) return Math.round(((od+1)*5 + ((od/ewDenom)+1)*5 - STAKE) * 100) / 100;
+      if (isPlaced) return Math.round(((od/ewDenom)+1)*5*100)/100 - STAKE;
+      return -STAKE;
     }
+  }
 
-    // Parse fractional odds string "5/1" → decimal multiplier 5.0
-    function parseOdds(oddsStr) {
-      if (!oddsStr || oddsStr === 'SP' || oddsStr === '') return 1.0;
-      const s = String(oddsStr).trim().toLowerCase();
-      if (s === 'evs' || s === 'evens' || s === '1/1') return 1.0;
-      const frac = s.match(/^(\d+)\/(\d+)$/);
-      if (frac) { const n = parseFloat(frac[1]), d = parseFloat(frac[2]); if (d > 0) return n / d; }
-      const dec = parseFloat(s);
-      if (!isNaN(dec) && dec > 0) return dec >= 2 ? dec - 1 : dec;
-      return 1.0;
+
+  function showToast(msg, type='info') {
+    const c = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`; t.textContent = msg; c.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+
+  // Normalise time: API may give "5:30" (could be 5am or 5pm depending on context)
+  // Evening races are always PM. If hour < 10, assume PM (add 12) for UK evening racing.
+  // This handles the case where off_time is stored without AM/PM indicator.
+  function normaliseRaceHour(h) {
+    // UK racing: if hour is between 1-9, it's almost certainly PM (13:00-21:00)
+    // Very early morning racing (before 10am) essentially doesn't exist in UK/Ireland
+    if (h >= 1 && h <= 9) return h + 12;
+    return h;
+  }
+
+  function isRaceLocked(race) {
+    const [h,m] = (race.time||'00:00').split(':').map(Number);
+    const correctedH = normaliseRaceHour(h);
+    const raceStr = race.date + 'T' + String(correctedH).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z';
+    const rt = new Date(raceStr);
+    return Date.now() >= rt.getTime() - 30 * 60 * 1000;
+  }
+
+  async function getUserProfile(uid) {
+    let s = await getDoc(doc(db,'users',uid)); if (s.exists()) return s;
+    s = await getDoc(doc(db,'Users',uid)); if (s.exists()) return s;
+    return null;
+  }
+
+  async function callAPI(endpoint) {
+    const r = await fetch(RACING_API_BASE+endpoint, {headers:RACING_HEADERS});
+    if (!r.ok) { const t=await r.text(); throw new Error(`API ${r.status}: ${t}`); }
+    return r.json();
+  }
+
+  // ===== AUTH =====
+  onAuthStateChanged(auth, async user => {
+    if (!user) { window.location.href='index.html'; return; }
+    const ud = await getUserProfile(user.uid);
+    if (!ud||!ud.exists()||ud.data().role!=='admin') { window.location.href='user.html'; return; }
+    currentUser = {uid:user.uid,...ud.data()};
+    document.getElementById('admin-name').textContent = currentUser.displayName||'Admin';
+    init();
+  });
+
+  async function init() {
+    try {
+      await Promise.all([loadUsers(), loadRaces()]);
+      loadResults(); loadLeaderboard(); updateStats();
+    } catch(err) {
+      console.error(err);
+      showToast('❌ '+err.message+' — Check Firestore Rules are published in Firebase Console', 'error');
     }
+  }
 
-    // Get paid place count for a race — uses Bet365 ew_places stored on runners,
-    // falls back to runner count rules if not available
-    // Use Bet365 ew_places directly — already includes any extra places they offer
-    function getRacePlaces(race) {
-      const n = (race.runners||[]).length;
-      const runnerWithEw = (race.runners||[]).find(r => r.ew_places > 0);
-      if (runnerWithEw) return runnerWithEw.ew_places;
-      // Fallback if no Bet365 data: standard rules
-      return n <= 7 ? 2 : n <= 14 ? 3 : 4;
-    }
-
-    // Get place fraction denominator (4 = 1/4, 5 = 1/5) from Bet365 data
-    // Use Bet365 stored ew_denom (4 = 1/4 odds, 5 = 1/5 odds), fall back to 4
-    function getEwDenom(race) {
-      const r = (race.runners||[]).find(r => r.ew_denom > 0);
-      return r ? r.ew_denom : 4;
-    }
-
-    // €5 each-way: €5 win + €5 place. Returns full payout, partial payout, or -€10 for loss.
-    // Calculate net profit/loss for a pick
-    // betType: 'ew' = €5 win + €5 place, 'win' = €10 win only
-    // Existing picks without betType default to 'ew'
-    function calcPoints(race, horseName, betType = 'ew') {
-      if (!race.result || !horseName) return 0;
-      const places  = getRacePlaces(race);
-      const { winner, second, third, fourth, fifth } = race.result;
-      const runner  = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-      const od      = parseOdds(runner?.odds);
-      const ewDenom = getEwDenom(race);
-      const STAKE   = 10; // total stake always €10
-
-      const isWinner = horseMatch(horseName, winner);
-      const isPlaced =
-        (places >= 2 && horseMatch(horseName, second)) ||
-        (places >= 3 && horseMatch(horseName, third))  ||
-        (places >= 4 && horseMatch(horseName, fourth)) ||
-        (places >= 5 && horseMatch(horseName, fifth));
-
-      if (betType === 'win') {
-        // Win only: €10 on win — only pays if wins
-        if (isWinner) return Math.round(((od+1)*STAKE - STAKE) * 100) / 100;
-        return -STAKE;
-      } else {
-        // Each way: €5 win + €5 place
-        if (isWinner) return Math.round(((od+1)*5 + ((od/ewDenom)+1)*5 - STAKE) * 100) / 100;
-        if (isPlaced) return Math.round(((od/ewDenom)+1)*5*100)/100 - STAKE;
-        return -STAKE;
-      }
-    }
-
-    function getOutcomeLabel(race, horseName) {
-      if (!race.result || !horseName) return null;
-      const places = getRacePlaces(race);
-      const { winner, second, third, fourth, fifth } = race.result;
-      if (horseMatch(horseName, winner))                return 'win';
-      if (places >= 2 && horseMatch(horseName, second)) return 'place';
-      if (places >= 3 && horseMatch(horseName, third))  return 'place';
-      if (places >= 4 && horseMatch(horseName, fourth)) return 'place';
-      if (places >= 5 && horseMatch(horseName, fifth))  return 'place';
-      return 'lose';
-    }
-
-    // ===== AUTH =====
-    async function getUserProfile(uid) {
-      let snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) return snap;
-      snap = await getDoc(doc(db, 'Users', uid));
-      return snap.exists() ? snap : null;
-    }
-
-    onAuthStateChanged(auth, async user => {
-      if (!user) { window.location.href = 'index.html'; return; }
-      const ud = await getUserProfile(user.uid);
-      if (!ud || !ud.exists()) { window.location.href = 'index.html'; return; }
-      currentUser = { uid: user.uid, ...ud.data() };
-      if (currentUser.role === 'admin') { window.location.href = 'admin.html'; return; }
-      document.getElementById('user-name').textContent = currentUser.displayName || 'Player';
-      await loadAll();
-      setInterval(loadAll, 60000);
+  // ===== TABS =====
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-'+name).classList.add('active');
+      btn.classList.add('active');
+      if (name==='results') loadResults();
+      if (name==='leaderboard') loadLeaderboard();
+      if (name==='races') loadRaces();
     });
+  });
 
-    // ===== TABS =====
-    document.querySelectorAll('.user-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.user-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.user-tab-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('utab-' + btn.dataset.utab).classList.add('active');
-        if (btn.dataset.utab === 'mypicks') renderMyPicks();
-        if (btn.dataset.utab === 'leaderboard') renderLeaderboard();
-      });
-    });
+  // ===== LOGOUT =====
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await signOut(auth); window.location.href='index.html';
+  });
 
-    // ===== LOAD ALL DATA =====
-    async function loadAll() {
-      // Active meeting
-      let raceDate = new Date().toISOString().split('T')[0];
+  // ===== USERS =====
+  async function loadUsers() {
+    try {
+      let snap = await getDocs(collection(db,'users'));
+      if (!snap.docs.length) snap = await getDocs(collection(db,'Users'));
+      allUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderUsers();
+    } catch(err) {
+      document.getElementById('users-list').innerHTML =
+        `<div class="alert alert-error">⚠️ Cannot load players: ${err.message}<br>
+        <small>Fix: Go to Firebase Console → Firestore → Rules tab → paste the simple rules → click Publish</small></div>`;
+    }
+  }
+
+  function renderUsers() {
+    const el = document.getElementById('users-list');
+    if (!allUsers.length) {
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">👤</div><h3>No players yet</h3><p>Click "+ Add Player" to get started</p></div>';
+      return;
+    }
+    el.innerHTML = `<div class="table-wrapper"><table>
+      <thead><tr><th>Player</th><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+      <tbody>${allUsers.map(u=>`
+        <tr>
+          <td><div class="user-info"><div class="user-avatar">${(u.displayName||'U')[0].toUpperCase()}</div>
+          <div class="user-name">${esc(u.displayName||'—')}</div></div></td>
+          <td><span class="badge badge-grey">${esc(u.username||'—')}</span></td>
+          <td><span class="badge ${u.role==='admin'?'badge-gold':'badge-green'}">${u.role}</span></td>
+          <td><div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" data-uid="${u.id}" data-name="${esc(u.displayName)}" data-action="resetpw">🔑 Reset PW</button>
+            <button class="btn btn-danger btn-sm" data-uid="${u.id}" data-name="${esc(u.displayName)}" data-action="delete">Delete</button>
+          </div></td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+    el.querySelectorAll('[data-action="resetpw"]').forEach(b=>b.addEventListener('click',()=>resetPW(b.dataset.uid,b.dataset.name)));
+    el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
+    loadUsersTabLeaderboard();
+  }
+
+  async function loadUsersTabLeaderboard() {
+    const el = document.getElementById('users-leaderboard');
+    if (!el) return;
+    try {
+      const picksSnap = await getDocs(collection(db,'picks'));
+      const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+      // Fetch ALL races from Firestore in one query (covers all festival days)
+      const racesCache = {};
       try {
-        const cfg = await getDoc(doc(db, 'config', 'activeMeeting'));
-        if (cfg.exists()) {
-          activeMeetingData = cfg.data();
-          raceDate = activeMeetingData.date || raceDate;
-          document.getElementById('meeting-venue-display').textContent = '🏟️ ' + (activeMeetingData.venue || 'Racing');
-          const d = new Date(raceDate + 'T12:00:00');
-          document.getElementById('meeting-date-display').textContent =
-            d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-          document.getElementById('user-welcome').textContent = activeMeetingData.venue || 'Racing';
-        } else {
-          document.getElementById('meeting-venue-display').textContent = '🏁 Racing';
-          document.getElementById('meeting-date-display').textContent = '';
-        }
-      } catch(e) {}
+        const allRacesSnap = await getDocs(collection(db,'races'));
+        allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
+      } catch(e) {
+        allRaces.forEach(r=>{ racesCache[r.id]=r; });
+        const raceIds=[...new Set(picks.map(p=>p.raceId))];
+        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
+        }));
+      }
 
-      // Today's races
-      const snap = await getDocs(query(collection(db,'races'), where('date','==',raceDate)));
-      allRaces = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      allRaces.sort((a,b) => a.time.localeCompare(b.time));
-
-      // Today's picks
-      const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',currentUser.uid)));
-      myPicks = {};
-      allMyPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      allMyPicks.forEach(p => {
-        if (p.raceId && p.horseName) myPicks[p.raceId] = p;
+      const scores = {};
+      allUsers.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+        scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
       });
 
-      renderRaces();
-      updateSummary();
+      for (const p of picks) {
+        if (!scores[p.userId]) continue;
+        scores[p.userId].picks++;
+        const race = racesCache[p.raceId];
+        if (!race||!race.result) continue;
+        const n = (race.runners||[]).length;
+        const {winner,second,third,fourth,fifth} = race.result;
+        const _pts = calcPoints(race, p.horseName, p.betType || 'ew');
+        scores[p.userId].pts += _pts;
+        if (_pts > 0) {
+          if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
+          else scores[p.userId].places++;
+        }
+      }
 
-      // Re-render picks tab if visible
-      if (document.getElementById('utab-mypicks').classList.contains('active')) renderMyPicks();
+      const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+      const medals = ['🥇','🥈','🥉'];
+      el.innerHTML = !sorted.length
+        ? '<div class="empty-state"><div class="empty-icon">📊</div><h3>No results yet</h3></div>'
+        : `<div class="table-wrapper"><table>
+            <thead><tr><th>Pos</th><th>Player</th><th>Wins</th><th>Places</th><th>Picks</th><th>Returned</th></tr></thead>
+            <tbody>${sorted.map((s,i)=>`
+              <tr style="${i===0?'background:rgba(201,168,76,0.08);font-weight:600;':''}">
+                <td style="font-size:1.1rem;">${medals[i]||(i+1)}</td>
+                <td><div class="user-info"><div class="user-avatar" style="width:32px;height:32px;font-size:0.85rem;">${(s.name||'U')[0].toUpperCase()}</div>
+                  <span>${esc(s.name)}</span></div></td>
+                <td><span class="badge badge-gold">${s.wins}</span></td>
+                <td><span class="badge badge-green">${s.places}</span></td>
+                <td style="color:var(--text-muted)">${s.picks}</td>
+                <td><strong style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);">€${s.pts.toFixed(2)}</strong></td>
+              </tr>`).join('')}
+            </tbody></table></div>`;
+    } catch(e) {
+      el.innerHTML = '<div style="padding:16px;color:var(--red);">Could not load leaderboard</div>';
     }
+  }
 
-    // ===== RENDER RACES =====
-    function renderRaces() {
-      const container = document.getElementById('races-container');
-      if (!allRaces.length) {
-        container.innerHTML = `
-          <div class="card"><div class="card-body">
-            <div class="empty-state">
-              <div class="empty-icon">🏁</div>
-              <h3>No races loaded yet</h3>
-              <p>The admin hasn't set up today's races yet. Check back soon!</p>
-            </div>
-          </div></div>`;
+  document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
+    this.disabled = true; this.textContent = '⏳ Checking…';
+    try {
+      const [picksSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db,'picks')),
+        getDocs(collection(db,'users'))
+      ]);
+      const validUserIds = new Set(usersSnap.docs.map(d=>d.id));
+      const orphaned = picksSnap.docs.filter(d => !validUserIds.has(d.data().userId));
+      if (!orphaned.length) { showToast('✅ No orphaned picks found', 'success'); return; }
+      if (!confirm(`Found ${orphaned.length} pick(s) from deleted users. Remove them?`)) return;
+      for (const d of orphaned) await deleteDoc(doc(db,'picks',d.id));
+      showToast(`🧹 Removed ${orphaned.length} orphaned pick(s)`, 'success');
+      loadLeaderboard(); updateStats();
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = '🧹 Clean Orphaned Picks'; }
+  });
+
+  document.getElementById('add-player-btn').addEventListener('click', () => {
+    ['user-display-name','user-username','user-password'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('user-role').value='user';
+    document.getElementById('user-modal-error').style.display='none';
+    document.getElementById('user-modal').style.display='flex';
+  });
+  document.getElementById('close-user-modal-btn').addEventListener('click', ()=>document.getElementById('user-modal').style.display='none');
+  document.getElementById('cancel-user-btn').addEventListener('click', ()=>document.getElementById('user-modal').style.display='none');
+
+  document.getElementById('save-user-btn').addEventListener('click', async () => {
+    const name=document.getElementById('user-display-name').value.trim();
+    const username=document.getElementById('user-username').value.trim().toLowerCase();
+    const pw=document.getElementById('user-password').value;
+    const role=document.getElementById('user-role').value;
+    const errEl=document.getElementById('user-modal-error');
+    if (!name||!username||!pw){errEl.textContent='Please fill in all fields.';errEl.style.display='block';return;}
+    if (pw.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
+    try {
+      const email = username + '@cheltenham.local';
+      // Use a secondary app instance so creating the user does NOT sign the admin out
+      const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + Date.now());
+      const secondaryAuth = getAuth(secondaryApp);
+      let cred;
+      try {
+        cred = await createUserWithEmailAndPassword(secondaryAuth, email, pw);
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          displayName: name, username, role, email,
+          createdAt: new Date().toISOString()
+        });
+      } finally {
+        // Always clean up the secondary app — critical so admin stays signed in
+        await secondaryAuth.signOut().catch(()=>{});
+        await deleteApp(secondaryApp).catch(()=>{});
+      }
+      document.getElementById('user-modal').style.display='none';
+      showToast(`✅ ${name} added! They can now log in with username "${username}".`, 'success');
+      await loadUsers(); updateStats();
+    } catch(err) {
+      let msg = err.message;
+      if (err.code === 'auth/email-already-in-use') {
+        // Check if it's an orphaned account (Auth exists but no Firestore profile)
+        // If so, delete the orphaned Auth account via proxy and retry
+        try {
+          const email = username + '@cheltenham.local';
+          // Ask proxy to look up and delete the orphaned auth user by email
+          const cleanResp = await fetch(`${PROXY_BASE}/admin/delete-auth-user-by-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          });
+          if (cleanResp.ok) {
+            // Retry creation
+            errEl.textContent = 'Previous orphaned account found — retrying…';
+            errEl.style.display = 'block';
+            document.getElementById('save-user-btn').click();
+            return;
+          }
+        } catch(retryErr) { /* ignore */ }
+        msg = `Username "${username}" already exists. If you just deleted this user, wait a moment and try again, or use a different username.`;
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password must be at least 6 characters.';
+      }
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    }
+  });
+
+  async function resetPW(uid,name) {
+    const pw=prompt(`New password for ${name}:`);
+    if (!pw||pw.length<6){showToast('Need 6+ characters','error');return;}
+    await updateDoc(doc(db,'users',uid),{tempPassword:pw,tempPasswordNote:'Admin reset'});
+    showToast(`Password saved for ${name}. Note: Firebase requires the user to be logged in to change their own Auth password. Share the new password directly.`,'success');
+  }
+
+  async function deleteUser(uid, name) {
+    if (!confirm(`Delete "${name}"?\n\nThis will remove their account, picks, and allow re-use of the same username.`)) return;
+    try {
+      // 1. Delete all picks
+      const picksSnap = await getDocs(query(collection(db,'picks'), where('userId','==',uid)));
+      for (const d of picksSnap.docs) await deleteDoc(doc(db,'picks',d.id));
+
+      // 2. Delete Firestore profile
+      await deleteDoc(doc(db,'users',uid));
+
+      // 3. Delete from Firebase Auth via proxy (server-side Admin SDK)
+      //    The proxy has Firebase Admin credentials and can delete any Auth account.
+      try {
+        const resp = await fetch(`${PROXY_BASE}/admin/delete-auth-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid })
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          console.warn('Proxy auth delete failed:', result.error || resp.status);
+          // Non-fatal: Firestore profile is gone so login returns "profile missing"
+          // Admin can still recreate with same username if Auth account is cleaned up
+        }
+      } catch(authErr) {
+        console.warn('Could not reach proxy for auth delete:', authErr.message);
+        // Non-fatal — profile is deleted, orphaned auth account blocks username reuse
+        // but proxy will handle it on next creation attempt
+      }
+
+      showToast(`🗑️ ${name} fully removed. You can recreate them with the same username.`, 'success');
+      await loadUsers(); loadLeaderboard(); updateStats();
+    } catch(err) {
+      showToast('❌ Error deleting user: ' + err.message, 'error');
+    }
+  }
+
+  // ===== RACES =====
+  function setDayActive(day) {
+    selectedDay = day;
+    document.getElementById('day-today-btn').classList.toggle('day-active', day==='today');
+    document.getElementById('day-today-btn').classList.toggle('btn-outline', day!=='today');
+    document.getElementById('day-tomorrow-btn').classList.toggle('day-active', day==='tomorrow');
+    document.getElementById('day-tomorrow-btn').classList.toggle('btn-outline', day==='today');
+  }
+  document.getElementById('day-today-btn').addEventListener('click', () => {
+    setDayActive('today');
+    document.getElementById('meeting-picker').style.display='none';
+  });
+  document.getElementById('day-tomorrow-btn').addEventListener('click', () => {
+    setDayActive('tomorrow');
+    document.getElementById('meeting-picker').style.display='none';
+  });
+
+  document.getElementById('browse-btn').addEventListener('click', async function() {
+    this.disabled=true; this.textContent='⏳ Loading…';
+    try {
+      const data = await callAPI(`/racecards/free?day=${selectedDay}`);
+      const all = data.racecards||[];
+      if (!all.length){showToast('No meetings found from API for '+selectedDay,'error');return;}
+      const venueMap={};
+      for (const r of all){
+        // Strip country suffix for display/storage e.g. "Fairyhouse (IRE)" → "Fairyhouse"
+        const v = String(r.course||'Unknown').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim();
+        if(!venueMap[v])venueMap[v]=[];
+        venueMap[v].push(r);
+      }
+      const grid=document.getElementById('meeting-grid');
+      grid.innerHTML=Object.keys(venueMap).sort().map(venue=>{
+        const races=venueMap[venue];
+        const times=races.map(r=>r.off_time||'').filter(Boolean).sort();
+        const isActive=activeMeeting&&activeMeeting.venue===venue&&activeMeeting.day===selectedDay;
+        return `<div class="meeting-card${isActive?' meeting-active':''}" data-venue="${esc(venue)}" data-day="${selectedDay}">
+          <div class="meeting-venue">🏟️ ${esc(venue)}</div>
+          <div class="meeting-meta">${races.length} races &nbsp;•&nbsp; ${times[0]||'—'} – ${times[times.length-1]||'—'}</div>
+          ${isActive?'<div class="meeting-loaded-tag">✅ Currently Loaded</div>':'<div class="meeting-load-btn">Tap to Load for Players →</div>'}
+        </div>`;
+      }).join('');
+      grid.querySelectorAll('.meeting-card').forEach(c=>c.addEventListener('click',()=>loadMeeting(c.dataset.venue,c.dataset.day)));
+      document.getElementById('meeting-picker').style.display='block';
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{this.disabled=false;this.textContent='🔍 Browse Meetings';}
+  });
+
+  async function loadMeeting(venue,day) {
+    showToast(`⏳ Loading ${venue}…`,'info');
+    document.querySelectorAll('.meeting-card').forEach(c=>c.style.opacity='0.5');
+    const _now = new Date();
+    const _today = _now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0')+'-'+String(_now.getDate()).padStart(2,'0');
+    const _tmrw  = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate()+1);
+    const _tomorrowStr = _tmrw.getFullYear()+'-'+String(_tmrw.getMonth()+1).padStart(2,'0')+'-'+String(_tmrw.getDate()).padStart(2,'0');
+    const date = day==='tomorrow' ? _tomorrowStr : _today;
+    try {
+      const data=await callAPI(`/racecards/free?day=${day}`);
+      const venueRaces=(data.racecards||[]).filter(r=>venueMatch(r.course||'',venue));
+      if (!venueRaces.length){showToast(`No races found for ${venue}`,'error');return;}
+
+      // Load existing races for this date so we can preserve any results already recorded
+      const existing=await getDocs(query(collection(db,'races'),where('date','==',date)));
+      const existingByApiId={};
+      existing.docs.forEach(d=>{ const data=d.data(); if(data.apiId) existingByApiId[data.apiId]={id:d.id,...data}; });
+
+      // Delete races for this date that are no longer in the racecard (venue change etc)
+      const newApiIds=new Set(venueRaces.map(r=>(r.race_id||r.id||'').toString()));
+      for (const d of existing.docs) {
+        if (!newApiIds.has(d.data().apiId)) await deleteDoc(doc(db,'races',d.id));
+      }
+
+      for (const r of venueRaces) {
+        const apiId=(r.race_id||r.id||'').toString();
+        const raceId=`${date}-${apiId.replace(/[^a-zA-Z0-9]/g,'')||Math.random().toString(36).slice(2)}`;
+        let time=r.off_time||'00:00';
+        if (time.includes('T')) time=time.split('T')[1].slice(0,5);
+
+        // Preserve existing result, extraPlace flag, and odds if already recorded
+        const prev=existingByApiId[apiId]||{};
+
+        await setDoc(doc(db,'races',raceId),{
+          apiId, name:r.race_name||r.name||'Unknown Race',
+          time, date, venue: String(r.course||venue).replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim(),
+          distance:r.distance||'', class:r.class||r.race_class||'',
+          // Preserve previously recorded result and admin flags
+          ...(prev.result    ? { result: prev.result }       : {}),
+          ...(prev.extraPlace? { extraPlace: prev.extraPlace }: {}),
+          runners:(r.runners||[]).map(h=>{
+            // Preserve any odds already entered for this horse
+            const prevRunner=(prev.runners||[]).find(pr=>pr.name===h.horse||pr.name===h.name);
+            return {
+              id:(h.horse_id||h.runner_id||h.id||'').toString(),
+              name:h.horse||h.name||'Unknown',
+              jockey:h.jockey||'',
+              trainer:h.trainer||'',
+              form:h.form||'',
+              draw:h.draw!=null?String(h.draw):'',
+              number:(h.number||h.saddle_cloth_number||h.cloth||'').toString(),
+              ...(prevRunner?.odds ? { odds: prevRunner.odds } : {}),
+              ...(prevRunner?.nr   ? { nr: prevRunner.nr }     : {})
+            };
+          })
+        });
+      }
+      activeMeeting={venue,day,date};
+      await setDoc(doc(db,'config','activeMeeting'),{venue,day,date,loadedAt:new Date().toISOString()});
+
+      // Scrape odds and merge into saved races
+      showToast('📊 Fetching odds…','info');
+      try {
+        const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(venue)}&date=${date}&day=${day}`);
+        const oddsData = await oddsResp.json();
+        if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+          const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',date)));
+          let oddsMatched = 0;
+          for (const raceDoc of racesSnap.docs) {
+            const race = raceDoc.data();
+            const updatedRunners = (race.runners||[]).map(r => {
+              // Match by "HH:MM|HORSENAME" first (accurate), fall back to flat name match
+              // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+              const detail = oddsData.runnerDetails && oddsData.runnerDetails[timeKey];
+              if (odd) oddsMatched++;
+              return { ...r, odds: odd || 'SP',
+                ...(detail ? { ew_places: detail.ew_places, ew_denom: detail.ew_denom } : {}) };
+            });
+            await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+          }
+          showToast(`✅ ${venueRaces.length} races loaded with odds for ${oddsMatched} horses!`,'success');
+        } else {
+          showToast(`✅ ${venueRaces.length} races loaded (odds unavailable yet — try "Refresh Odds" closer to race time)`,'success');
+        }
+      } catch(oddsErr) {
+        console.warn('Odds scrape failed:', oddsErr.message);
+        showToast(`✅ ${venueRaces.length} races loaded (could not fetch odds: ${oddsErr.message})`,'success');
+      }
+
+      await loadRaces();
+      document.getElementById('meeting-picker').style.display='none';
+      loadResults(); updateStats();
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{document.querySelectorAll('.meeting-card').forEach(c=>c.style.opacity='1');}
+  }
+
+  document.getElementById('refresh-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching…';
+    // Also refresh scraped odds
+    try {
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}&day=${activeMeeting.day||'today'}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => ({
+            ...r, odds: (oddsData.odds && (() => { const [h2,m2]=(race.time||'00:00').split(':').map(Number); const nh=(h2>=1&&h2<=9)?h2+12:h2; return oddsData.odds[String(nh).padStart(2,'0')+':'+String(m2).padStart(2,'0')+'|'+r.name.toUpperCase()]; })())
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || r.odds || 'SP'
+          }));
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+        }
+        console.log('Odds refreshed from scraper');
+      }
+    } catch(e) { console.warn('Odds refresh skipped:', e.message); }
+    try {
+      const data=await callAPI('/results/today');
+      const vr=(data.results||[]).filter(r=>venueMatch(r.course||'',activeMeeting.venue));
+      let updated=0;
+      for (const result of vr) {
+        const apiId=(result.race_id||result.id||'').toString();
+        const match=allRaces.find(r=>r.apiId===apiId);
+        if (!match||match.result) continue;
+        const runners=result.runners||[];
+        const w=runners.find(r=>parseInt(r.position)===1||parseInt(r.finishing_position)===1);
+        if (!w) continue;
+        await updateDoc(doc(db,'races',match.id),{result:{
+          winner:w.horse||w.name,
+          second:(runners.find(r=>parseInt(r.position)===2)||{}).horse||'',
+          third:(runners.find(r=>parseInt(r.position)===3)||{}).horse||'',
+          recordedAt:new Date().toISOString(),recordedBy:'api-auto'
+        }});
+        updated++;
+      }
+      await loadRaces(); loadResults(); loadLeaderboard();
+      showToast(`✅ ${updated} new result(s) recorded`,'success');
+    } catch(err){showToast('❌ '+err.message,'error');}
+    finally{this.disabled=false;this.textContent='🏆 Refresh Results';}
+  });
+
+  // Fetch results for any past date
+  document.getElementById('fetch-past-results-btn').addEventListener('click', async function() {
+    if (!activeMeeting) { showToast('No active meeting loaded','error'); return; }
+    this.disabled = true; this.textContent = '⏳ Fetching…';
+    try {
+      // Try today endpoint first, fall back to /results/free
+      const data = await callAPI('/results/today');
+
+      const results = data.results || [];
+      if (!results.length) { showToast('No results from API yet — races may not have finished','info'); return; }
+
+      // Log what courses came back so we can debug venue matching
+      const courses = [...new Set(results.map(r=>r.course).filter(Boolean))];
+      console.log('API courses returned:', courses);
+      console.log('Active meeting venue:', activeMeeting.venue);
+
+      const vr = results.filter(r => venueMatch(r.course||'', activeMeeting.venue));
+      if (!vr.length) {
+        showToast(`No results for "${activeMeeting.venue}" yet — API has: ${courses.slice(0,4).join(', ')}`, 'info');
         return;
       }
-      container.innerHTML = allRaces.map(race => renderRaceCard(race)).join('');
-    }
 
-    function renderRaceCard(race) {
-      const locked    = isRaceLocked(race);
-      const myPick    = myPicks[race.id];
-      const hasResult = !!race.result;
-      const timeUntil = getTimeUntil(race);
-      const urgent    = !locked && timeUntil < 60 * 60 * 1000;
-      const n         = (race.runners || []).length;
-      const places    = getPlaceCount(n, race.extraPlace);
+      const racesSnap = await getDocs(query(collection(db,'races'), where('date','==',activeMeeting.date)));
+      let updated = 0, skipped = 0;
 
-      // Result bar
-      let resultHtml = '';
-      if (hasResult) {
-        const picked    = myPick?.horseName;
-        const outcome   = picked ? getOutcomeLabel(race, picked) : null;
-        const pts       = picked ? calcPoints(race, picked) : 0;
+      for (const result of vr) {
+        const apiId = (result.race_id || result.id || '').toString();
+        const match = racesSnap.docs.find(d => d.data().apiId === apiId);
+        if (!match) { skipped++; continue; }
 
-        const placeList = [
-          race.result.second && `2nd: ${esc(race.result.second)}`,
-          race.result.third  && `3rd: ${esc(race.result.third)}`,
-          race.result.fourth && `4th: ${esc(race.result.fourth)}`
-        ].filter(Boolean);
+        const raceData = match.data();
+        const runners = result.runners || [];
+        const atPos = n => runners.find(r => parseInt(r.position || r.finishing_position || 99) === n);
+        // Strip country suffix from horse names when saving
+        const horseName = r => r ? String(r.horse||r.name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim() : '';
 
-        resultHtml = `
-          <div class="race-result-bar">
-            <span>🏆</span>
-            <span class="winner-label">${esc(race.result.winner)}</span>
-            ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
-            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +€${pts.toFixed(2)}</span>` : ''}
-            ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +€${pts.toFixed(2)}</span>` : ''}
-            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ Lost -€10.00</span>` : ''}
-            ${pts !== 0 ? `<span class="points-badge ${pts<0?'lost-points':outcome==='place'?'place-points':''}">${pts<0?'-€'+Math.abs(pts).toFixed(2):'+€'+pts.toFixed(2)}</span>` : ''}
-          </div>`;
+        const w = atPos(1);
+        if (!w) continue;
+
+        // Apply correct place rules based on runner count
+        const numRunners = (raceData.runners||[]).length;
+        const places = getPlaces(numRunners, raceData.extraPlace||false);
+
+        const newResult = {
+          winner: horseName(w),
+          second: places >= 2 ? horseName(atPos(2)) : '',
+          third:  places >= 3 ? horseName(atPos(3)) : '',
+          fourth: places >= 4 ? horseName(atPos(4)) : '',
+          fifth:  places >= 5 ? horseName(atPos(5)) : '',
+          recordedAt: new Date().toISOString(),
+          recordedBy: 'fetch-btn'
+        };
+
+        // Only skip if result is identical — allow updating previously fetched results
+        const prev = raceData.result || {};
+        if (prev.winner && horseMatch(prev.winner, newResult.winner)) { skipped++; continue; }
+
+        await updateDoc(doc(db,'races',match.id), { result: newResult });
+        updated++;
       }
 
-      // Place hint — uses Bet365 ew_places where available
-      const paidPlaces = getRacePlaces(race) - 1;
-      const ewDenom = getEwDenom(race);
-      const placeHint = paidPlaces + ' place' + (paidPlaces !== 1 ? 's' : '') + (race.extraPlace ? ' +extra' : '');
+      showToast(
+        updated ? `✅ ${updated} result(s) saved${skipped?' ('+skipped+' unchanged)':''}` :
+        skipped  ? 'All results already up to date' : 'No matching races found',
+        updated ? 'success' : 'info'
+      );
+      await loadRaces(); loadResults(); loadLeaderboard();
+    } catch(err) { showToast('❌ ' + err.message, 'error'); }
+    finally { this.disabled = false; this.textContent = "🏆 Fetch Today's Results"; }
+  });
 
-      const horsesHtml = locked
-        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? (() => { const r = (race.runners||[]).find(r => horseMatch(r.name, myPick.horseName)); const oddsStr = r?.odds ? ` (${r.odds})` : ''; const betBadge = myPick.betType === 'win' ? ' <span style="background:var(--gold);color:var(--dark);font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;">WIN</span>' : ' <span style="background:var(--green);color:white;font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;">E/W</span>'; return ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong><span style="color:var(--text-muted);font-weight:400;">${oddsStr}</span>${betBadge}`; })() : ' — no pick made'}</div>`
-        : `<div class="horses-grid">
-            ${(race.runners || []).map(horse => {
-              const isPicked = myPick?.horseName === horse.name;
-              const isNR = horse.nr === true || horse.name === 'NON-RUNNER' || (horse.number || '').toString().toUpperCase() === 'NR';
-              return `
-                <div class="horse-card ${isPicked?'picked':''} ${isNR?'nr-card':''} ${locked?'locked-card':''}"
-                     data-race-id="${race.id}"
-                     data-horse-name="${horse.name.replace(/"/g,'&quot;')}"
-                     data-pickable="${(!isNR && !locked) ? 'true' : 'false'}">
-                  <div class="horse-check">✓</div>
-                  ${horse.number ? `<div class="horse-number">${horse.number}</div>` : ''}
-                  <div class="horse-name">${esc(horse.name)}</div>
-                  ${isNR ? `<div class="horse-nr">Non-Runner</div>` : (() => {
-                    const _odds = horse.odds && horse.odds !== 'SP' ? horse.odds : null;
-                    const _od = _odds ? parseOdds(_odds) : null;
-                    const _winPts   = _od !== null ? Math.round((_od + 1) * 10) : null;
-                    const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 5) : null;
+  document.getElementById('refresh-odds-btn').addEventListener('click', async function() {
+    if (!activeMeeting){showToast('No active meeting','error');return;}
+    this.disabled=true; this.textContent='⏳ Fetching odds…';
+    try {
+      const oddsResp = await fetch(`${PROXY_BASE}/odds?venue=${encodeURIComponent(activeMeeting.venue)}&date=${activeMeeting.date}&day=${activeMeeting.day||'today'}`);
+      const oddsData = await oddsResp.json();
+      if (oddsData.odds && Object.keys(oddsData.odds).length > 0) {
+        const racesSnap = await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+        let matched = 0;
+        for (const raceDoc of racesSnap.docs) {
+          const race = raceDoc.data();
+          const updatedRunners = (race.runners||[]).map(r => {
+            // Normalise stored race time to 24h UTC to match Betfair's key format
+              // Racing API stores times in local 12h format e.g. "3:57" meaning 15:57
+              const [_h, _m] = (race.time || '00:00').split(':').map(Number);
+              const _normH = (_h >= 1 && _h <= 9) ? _h + 12 : _h;
+              const _normTime = String(_normH).padStart(2,'0') + ':' + String(_m).padStart(2,'0');
+              const timeKey = _normTime + '|' + r.name.toUpperCase();
+              const odd = (oddsData.odds && oddsData.odds[timeKey])
+                       || (oddsData.oddsFlat && oddsData.oddsFlat[r.name.toUpperCase()])
+                       || (oddsData.odds && oddsData.odds[r.name.toUpperCase()]);
+            if (odd) matched++;
+            const _detail = oddsData.runnerDetails && oddsData.runnerDetails[_normTime + '|' + r.name.toUpperCase()];
+            return { ...r, odds: odd || r.odds || 'SP',
+              ...(_detail ? { ew_places: _detail.ew_places, ew_denom: _detail.ew_denom } : {}) };
+          });
+          await updateDoc(doc(db,'races',raceDoc.id), { runners: updatedRunners });
+        }
+        await loadRaces();
+        showToast(`✅ Odds updated for ${matched} horses!`,'success');
+      } else {
+        showToast('⚠️ No odds found — they may not be published yet. Try again closer to race time.','error');
+      }
+    } catch(err) {
+      showToast('❌ Could not fetch odds: '+err.message,'error');
+    } finally {
+      this.disabled=false; this.textContent='📊 Refresh Odds';
+    }
+  });
 
-                    return (_odds
-                      ? `<div class="horse-odds">${_odds}</div>
-                         <div class="horse-potential">Win: €${(((_od+1)*5)+((_od/ewDenom+1)*5)).toFixed(2)} · Place: €${((_od/ewDenom+1)*5).toFixed(2)}</div>`
-                      : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
-                      + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
-                  })()}
-                  <div class="horse-details">
-                    ${horse.jockey  ? `🧑 ${esc(horse.jockey)}<br>` : ''}
-                    ${horse.trainer ? `🎓 ${esc(horse.trainer)}` : ''}
-                  </div>
-                </div>`;
-            }).join('')}
-          </div>`;
+  document.getElementById('clear-meeting-btn').addEventListener('click', ()=>{
+    activeMeeting=null;
+    document.getElementById('active-meeting-banner').classList.remove('visible');
+    document.getElementById('races-tab-badge').style.display='none';
+    allRaces=[]; renderRaces();
+  });
 
-      return `
-        <div class="race-card" id="race-${race.id}">
-          <div class="race-card-header ${locked?'locked':''}">
-            <div class="race-meta">
-              <div class="race-time ${locked?'locked-time':''}">${race.time}</div>
+  async function loadRaces() {
+    if (!activeMeeting) {
+      try { const cfg=await getDoc(doc(db,'config','activeMeeting')); if (cfg.exists()) activeMeeting=cfg.data(); } catch(e){}
+    }
+    if (!activeMeeting){renderRaces();return;}
+
+    // Re-evaluate 'today' vs 'tomorrow' based on actual current date
+    // (a meeting saved as 'tomorrow' yesterday is now 'today')
+    const _n = new Date();
+    const _todayStr = _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+    const _tmrw = new Date(_n.getFullYear(), _n.getMonth(), _n.getDate()+1);
+    const _tmrwStr = _tmrw.getFullYear()+'-'+String(_tmrw.getMonth()+1).padStart(2,'0')+'-'+String(_tmrw.getDate()).padStart(2,'0');
+    if (activeMeeting.date === _todayStr)      activeMeeting.day = 'today';
+    else if (activeMeeting.date === _tmrwStr)  activeMeeting.day = 'tomorrow';
+    // Sync day buttons to match restored meeting
+    if (typeof setDayActive === 'function') setDayActive(activeMeeting.day || 'today');
+
+    const snap=await getDocs(query(collection(db,'races'),where('date','==',activeMeeting.date)));
+    allRaces=snap.docs.map(d=>({id:d.id,...d.data()}));
+    allRaces.sort((a,b)=>a.time.localeCompare(b.time));
+    document.getElementById('active-meeting-name').textContent='🏟️ '+activeMeeting.venue;
+    document.getElementById('active-meeting-meta').textContent=`${allRaces.length} races • ${activeMeeting.day==='today'?'Today':'Tomorrow'} (${activeMeeting.date})`;
+    document.getElementById('active-meeting-banner').classList.add('visible');
+    const badge=document.getElementById('races-tab-badge');
+    badge.textContent=allRaces.length+' races loaded'; badge.style.display='inline-flex';
+    renderRaces();
+  }
+
+  function renderRaces() {
+    const el=document.getElementById('races-list');
+    if (!allRaces.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🏁</div><h3>No meeting selected yet</h3><p>Click "Browse Meetings" to pick a race meeting</p></div>';return;}
+    el.innerHTML=`<div class="table-wrapper"><table>
+      <thead><tr><th>Time</th><th>Race</th><th>Runners</th><th>Status</th><th>Result</th></tr></thead>
+      <tbody>${allRaces.map(r=>`<tr>
+        <td><strong>${r.time}</strong></td>
+        <td>${esc(r.name)}<br><small style="color:var(--text-muted)">${esc(r.venue||'')}</small></td>
+        <td>${(r.runners||[]).length}</td>
+        <td><span class="${isRaceLocked(r)?'lock-badge':'lock-badge open'}">${isRaceLocked(r)?'🔒 Locked':'🟢 Open'}</span></td>
+        <td>${r.result?`<span class="badge badge-gold">🏆 ${esc(r.result.winner)}</span>`:'<span style="color:var(--text-muted);font-size:0.85rem;">Pending</span>'}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  // ===== RESULTS =====
+  async function loadResults() {
+    const el = document.getElementById('results-list');
+    el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
+
+    // Load ALL picks across all dates
+    const picksSnap = await getDocs(collection(db, 'picks'));
+    const allPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.horseName && p.raceId);
+    if (!allPicks.length) {
+      el.innerHTML = "<div class='empty-state'><div class='empty-icon'>🏆</div><h3>No picks yet</h3><p>Players have not made any picks yet</p></div>";
+      return;
+    }
+
+    // Get all unique raceIds from picks, then fetch those races
+    const raceIds = [...new Set(allPicks.map(p => p.raceId))];
+    const allResultRaces = [];
+    // Fetch in batches of 30 using individual getDoc calls
+    await Promise.all(raceIds.map(async id => {
+      try {
+        const d = await getDoc(doc(db, 'races', id));
+        if (d.exists()) allResultRaces.push({ id: d.id, ...d.data() });
+      } catch(e) {}
+    }));
+
+    // Also include allRaces (active meeting) so new races with no picks yet show up
+    for (const r of allRaces) {
+      if (!allResultRaces.find(x => x.id === r.id)) allResultRaces.push(r);
+    }
+
+    // Group by date then venue
+    const byDate = {};
+    allResultRaces.forEach(race => {
+      const date = race.date || 'unknown';
+      if (!byDate[date]) byDate[date] = {};
+      const venue = race.venue || 'Unknown';
+      if (!byDate[date][venue]) byDate[date][venue] = [];
+      byDate[date][venue].push(race);
+    });
+
+    // Sort dates descending (most recent first)
+    const sortedDates = Object.keys(byDate).sort().reverse();
+
+    let html = '';
+    const allRenderedRaces = []; // track for event listeners
+
+    for (const date of sortedDates) {
+      const d = new Date(date + 'T12:00:00');
+      const dateLabel = d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+      html += `<div style="margin-bottom:28px;">
+        <div style="background:var(--green);color:white;padding:12px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--gold-light);">${dateLabel}</div>
+            <div style="font-size:0.8rem;opacity:0.7;">${Object.keys(byDate[date]).join(' • ')}</div>
+          </div>
+        </div>`;
+
+      for (const [venue, races] of Object.entries(byDate[date])) {
+        const sortedRaces = races.sort((a,b) => a.time.localeCompare(b.time));
+        for (const race of sortedRaces) {
+          allRenderedRaces.push(race);
+          const picks = allPicks.filter(p => p.raceId === race.id);
+          const hasResult = !!race.result;
+          const places = getRacePlaces(race);
+
+          const outcomeLabel = (pick) => {
+            if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
+            const {winner,second,third,fourth} = race.result;
+            const _pts = calcPoints(race, pick.horseName, pick.betType || 'ew');
+            const _ptsStr = _pts > 0 ? ` +€${_pts.toFixed(2)}` : _pts < 0 ? ` -€${Math.abs(_pts).toFixed(2)}` : '';
+            if (horseMatch(pick.horseName,winner)) return `<span class="badge badge-gold">🏆 Won${_ptsStr}</span>`;
+            if (places>=2&&horseMatch(pick.horseName,second)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed${_ptsStr}</span>`;
+            if (places>=3&&horseMatch(pick.horseName,third))  return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed${_ptsStr}</span>`;
+            if (places>=4&&horseMatch(pick.horseName,fourth)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">4️⃣ Placed${_ptsStr}</span>`;
+            return `<span class="badge badge-red">❌ Lost${_ptsStr}</span>`;
+          };
+
+
+          const n = (race.runners||[]).length;
+          const ewDenom = getEwDenom(race);
+
+          html += `<div style="border:1px solid var(--cream-dark);border-top:none;overflow:hidden;${races.indexOf(race)===races.length-1?'border-radius:0 0 12px 12px;margin-bottom:16px;':''}">
+            <div style="background:var(--cream-dark);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
               <div>
-                <div class="race-name">${esc(race.name)}</div>
-                <div class="race-info">
-                  ${esc(race.venue||'Cheltenham')}
-                  ${race.distance ? '• '+esc(race.distance) : ''}
-                  • ${n} runners • ${placeHint}
+                <strong>${race.time} — ${esc(race.name)}</strong>
+                <div style="font-size:0.82rem;color:var(--text-muted);">${picks.length} pick${picks.length!==1?'s':''} • ${n} runners • ${places-1} place${places-1!==1?'s':''} (1/${ewDenom} odds)</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                ${hasResult?`<span class="badge badge-gold">🏆 ${esc(race.result.winner)}</span>`:''}
+                <button class="btn btn-secondary btn-sm" data-action="open-result" data-race-id="${race.id}">${hasResult?'✏️ Edit':'🏆 Record Result'}</button>
+              </div>
+            </div>
+
+            ${picks.length
+              ? `<div style="padding:0 20px;overflow-x:auto;"><table><thead><tr><th>Player</th><th>Horse</th><th>Outcome</th></tr></thead><tbody>
+                  ${picks.map(pick => {
+                    const user = allUsers.find(u => u.id === pick.userId);
+                    return `<tr>
+                      <td>${esc(user?.displayName||'Unknown')}</td>
+                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()} <span style="font-size:0.7rem;padding:1px 5px;border-radius:6px;font-weight:700;${pick.betType==='win'?'background:rgba(201,168,76,0.2);color:var(--gold-dark);':'background:rgba(27,77,46,0.1);color:var(--green);'}">${pick.betType==='win'?'WIN':'E/W'}</span></td>
+                      <td>${outcomeLabel(pick)}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody></table></div>`
+              : `<div style="padding:10px 20px;color:var(--text-muted);font-size:0.85rem;">No picks for this race</div>`
+            }
+          </div>`;
+      }
+      html += '</div>';
+    }
+    } // close for (const date of sortedDates)
+
+    el.innerHTML = html;
+
+    // Re-attach event listeners — openResultModal needs to search allResultRaces too
+    el.querySelectorAll('[data-action="open-result"]').forEach(b => b.addEventListener('click', () => {
+      const race = allResultRaces.find(r => r.id === b.dataset.raceId);
+      if (race) {
+        // Temporarily set resultContext and populate modal with this race's runners
+        resultContext = race;
+        document.getElementById('result-race-info').innerHTML = `<strong>${race.time} — ${esc(race.name)}</strong><div style="font-size:0.82rem;color:var(--text-muted);">${race.date} • ${race.venue||''}</div>`;
+        const opts = (race.runners||[]).map(r => `<option value="${esc(r.name)}" ${race.result?.winner===r.name?'selected':''}>${esc(r.name)}</option>`).join('');
+        const blank = '<option value="">— Select —</option>';
+        ['result-winner','result-second','result-third','result-fourth'].forEach(id => document.getElementById(id).innerHTML = blank+opts);
+        if (race.result) {
+          document.getElementById('result-winner').value = race.result.winner||'';
+          document.getElementById('result-second').value = race.result.second||'';
+          document.getElementById('result-third').value  = race.result.third||'';
+          document.getElementById('result-fourth').value = race.result.fourth||'';
+        }
+        document.getElementById('result-modal').style.display = 'flex';
+      }
+    }));
+    // override removed
+  }
+
+  // Result modal
+  async function openResultModal(raceId) {
+    const race = allRaces.find(r=>r.id===raceId); if (!race) return;
+    resultContext = race;
+    const n = (race.runners||[]).length;
+    const basePlaces = getPlaces(n, false);
+    const extraPlace = !!race.extraPlace;
+
+    document.getElementById('result-race-info').innerHTML =
+      `<strong>${race.time} — ${esc(race.name)}</strong>
+       <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px;">${n} runners · normally ${basePlaces} paid places</div>`;
+
+    const opts = (race.runners||[]).map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+    const blank = '<option value="">— Select —</option>';
+    ['result-winner','result-second','result-third','result-fourth','result-fifth'].forEach(id=>{
+      document.getElementById(id).innerHTML = blank+opts;
+    });
+
+    if (race.result) {
+      document.getElementById('result-winner').value = race.result.winner||'';
+      document.getElementById('result-second').value = race.result.second||'';
+      document.getElementById('result-third').value  = race.result.third||'';
+      document.getElementById('result-fourth').value = race.result.fourth||'';
+      document.getElementById('result-fifth').value  = race.result.fifth||'';
+    }
+
+    // Set extra place checkbox
+    document.getElementById('result-extra-place').checked = extraPlace;
+
+    // Show/hide place fields based on runner count + extra place
+    function updatePlaceFields() {
+      const extra = document.getElementById('result-extra-place').checked;
+      const totalPlaces = getPlaces(n, extra);
+      document.getElementById('result-second-group').style.display = totalPlaces >= 2 ? '' : 'none';
+      document.getElementById('result-third-group').style.display  = totalPlaces >= 3 ? '' : 'none';
+      document.getElementById('result-fourth-group').style.display = totalPlaces >= 4 ? '' : 'none';
+      document.getElementById('result-fifth-group').style.display  = totalPlaces >= 5 ? '' : 'none';
+    }
+    updatePlaceFields();
+    document.getElementById('result-extra-place').onchange = updatePlaceFields;
+
+    document.getElementById('result-modal').style.display = 'flex';
+  }
+
+  ['close-result-btn','cancel-result-btn'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('result-modal').style.display='none'));
+
+  document.getElementById('save-result-btn').addEventListener('click', async () => {
+    const winner = document.getElementById('result-winner').value;
+    if (!winner) { showToast('Please select a winner','error'); return; }
+    const extraPlace = document.getElementById('result-extra-place').checked;
+    await updateDoc(doc(db,'races',resultContext.id), {
+      extraPlace,
+      result: {
+        winner,
+        second: document.getElementById('result-second').value,
+        third:  document.getElementById('result-third').value,
+        fourth: document.getElementById('result-fourth').value,
+        fifth:  document.getElementById('result-fifth').value,
+        recordedAt: new Date().toISOString(), recordedBy: currentUser.uid
+      }
+    });
+    showToast('🏆 Result saved!','success');
+    document.getElementById('result-modal').style.display = 'none';
+    await loadRaces(); loadResults(); loadLeaderboard();
+  });
+
+  // Override modal
+  async function openOverrideModal(pickId,raceId) {
+    const race=allRaces.find(r=>r.id===raceId);
+    const snap=await getDocs(collection(db,'picks'));
+    const pick=snap.docs.map(d=>({id:d.id,...d.data()})).find(p=>p.id===pickId);
+    if (!race||!pick) return;
+    overrideContext={pick,race};
+    const user=allUsers.find(u=>u.id===pick.userId);
+    document.getElementById('override-info').innerHTML=`<strong>Player:</strong> ${esc(user?.displayName||'Unknown')}<br><strong>Race:</strong> ${race.time} — ${esc(race.name)}<br><strong>Current Pick:</strong> ${esc(pick.horseName)}`;
+    document.getElementById('override-horse').innerHTML=(race.runners||[]).map(r=>`<option value="${esc(r.name)}" ${pick.horseName===r.name?'selected':''}>${esc(r.name)}</option>`).join('');
+    document.getElementById('override-reason').value='';
+    document.getElementById('override-modal').style.display='flex';
+  }
+  ['close-override-btn','cancel-override-btn'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('override-modal').style.display='none'));
+  document.getElementById('save-override-btn').addEventListener('click', async()=>{
+    const newHorse = document.getElementById('override-horse').value;
+    const reason   = document.getElementById('override-reason').value;
+    await updateDoc(doc(db,'picks',overrideContext.pick.id),{
+      horseName: newHorse,
+      overrideBy: currentUser.uid, overrideReason: reason,
+      overrideAt: new Date().toISOString(), originalPick: overrideContext.pick.horseName
+    });
+    // Also write the overridden horse as winner on the race doc so leaderboard scoring works
+    // Only do this if the race has no result yet
+    const race = allRaces.find(r=>r.id===overrideContext.raceId) ||
+                 (await getDoc(doc(db,'races',overrideContext.raceId))).data();
+    if (race && !race.result) {
+      await updateDoc(doc(db,'races',overrideContext.raceId),{
+        result: { winner: newHorse, second:'', third:'', fourth:'',
+                  recordedAt: new Date().toISOString(), recordedBy: 'override-'+currentUser.uid }
+      });
+    }
+    showToast('Override applied','success');
+    document.getElementById('override-modal').style.display='none';
+    await loadRaces(); loadResults(); loadLeaderboard(); updateStats();
+  });
+
+  // ===== AUTO-PICK BY FORM =====
+
+  // Score a form string — reads right to left (most recent first)
+  // Returns numeric score: higher = better recent form
+  function scoreForm(formStr) {
+    if (!formStr) return -1;
+    // Extract only meaningful characters: 1-9, 0(=10th+), P F U R (bad)
+    const chars = String(formStr).replace(/[-\/\s]/g, '').split('').reverse(); // most recent first
+    const bad = new Set(['P','F','U','R','p','f','u','r']);
+    let score = 0;
+    const weights = [10, 7, 5, 3, 2, 1]; // recent runs worth more
+    chars.slice(0, 6).forEach((c, i) => {
+      const w = weights[i] || 1;
+      if (bad.has(c))        score += w * -2;  // falls/PU = very bad
+      else if (c === '0')    score += w * 0;   // 10th+ = neutral
+      else {
+        const pos = parseInt(c);
+        if (pos === 1)       score += w * 10;  // win = best
+        else if (pos === 2)  score += w * 7;
+        else if (pos === 3)  score += w * 5;
+        else if (pos <= 5)   score += w * 2;
+        else                 score += w * -1;  // 6th-9th = slightly bad
+      }
+    });
+    return score;
+  }
+
+  document.getElementById('autopick-btn').addEventListener('click', async () => {
+    if (!activeMeeting || !allRaces.length) {
+      showToast('Load a meeting first', 'error'); return;
+    }
+
+    // Populate user dropdown
+    const userSel = document.getElementById('autopick-user-select');
+    userSel.innerHTML = allUsers
+      .filter(u => u.role === 'user' || u.role === 'player')
+      .map(u => `<option value="${u.id}">${esc(u.displayName || u.username)}</option>`)
+      .join('');
+    if (!userSel.options.length) {
+      showToast('No players found', 'error'); return;
+    }
+
+    // Analyse each race
+    const recommendations = allRaces
+      .filter(r => !r.result)  // skip races with results already
+      .map(race => {
+        const runners = (race.runners || []).filter(r => !r.nr);
+        if (!runners.length) return null;
+
+        // Score each runner by form
+        const scored = runners.map(r => ({
+          ...r,
+          formScore: scoreForm(r.form)
+        })).sort((a, b) => b.formScore - a.formScore);
+
+        const pick = scored[0];
+        const second = scored[1];
+
+        return { race, pick, second, allScored: scored };
+      })
+      .filter(Boolean);
+
+    // Render results
+    const el = document.getElementById('autopick-results');
+    if (!recommendations.length) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">All races have results recorded — nothing to pick.</div>';
+    } else {
+      el.innerHTML = recommendations.map(({ race, pick, second, allScored }) => {
+        const formBar = allScored.slice(0, 4).map(r =>
+          `<span style="font-size:0.75rem;padding:2px 6px;border-radius:10px;background:var(--cream-dark);color:var(--text-dark);">
+            ${esc(r.name)} <span style="color:var(--text-muted);">${r.form||'—'}</span>
+            <span style="color:var(--green);font-weight:700;">(${r.formScore})</span>
+          </span>`
+        ).join(' ');
+
+        const isLocked = isRaceLocked(race);
+        return `
+          <div style="padding:14px 20px;border-bottom:1px solid var(--cream-dark);${isLocked?'opacity:0.6;':''}" data-race-id="${race.id}" data-pick="${esc(pick.name)}">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+              <span style="background:var(--green);color:white;padding:3px 10px;border-radius:8px;font-weight:700;font-size:0.9rem;">${race.time}</span>
+              <span style="font-weight:700;">${esc(race.name)}</span>
+              ${isLocked ? '<span style="font-size:0.75rem;background:var(--red);color:white;padding:2px 8px;border-radius:8px;">🔒 Locked</span>' : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+              <div>
+                <div style="font-size:0.8rem;color:var(--text-muted);">Top pick</div>
+                <div style="font-weight:700;font-size:1.05rem;color:var(--green);">
+                  🐴 ${esc(pick.name)}
+                  ${pick.odds ? `<span style="color:var(--gold-dark);font-size:0.85rem;">${pick.odds}</span>` : ''}
+                  <span style="font-size:0.8rem;color:var(--text-muted);">Form: ${pick.form||'—'}</span>
+                  <span style="font-size:0.78rem;font-weight:400;background:rgba(27,77,46,0.1);padding:1px 6px;border-radius:8px;">score: ${pick.formScore}</span>
                 </div>
               </div>
+              ${second ? `<div style="font-size:0.82rem;color:var(--text-muted);">2nd: ${esc(second.name)} (${second.form||'—'}) score:${second.formScore}</div>` : ''}
             </div>
-            <div class="race-status-area">
-              ${locked
-                ? `<span class="lock-badge">🔒 Locked</span>
-                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)} <span style="font-size:0.7rem;opacity:0.8;">${myPick.betType==='win'?'WIN':'E/W'}</span></div>` : ''}`
-                : `<span class="lock-badge open">🟢 Open</span>
-                   <span class="countdown ${urgent?'urgent':''}">${formatTimeUntil(timeUntil)}</span>`}
-            </div>
-          </div>
-          ${horsesHtml}
-          ${resultHtml}
-        </div>`;
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${formBar}</div>
+          </div>`;
+      }).join('');
     }
 
-    // ===== MY PICKS TAB =====
-    async function renderMyPicks() {
-      const container = document.getElementById('mypicks-container');
-      if (!allMyPicks.length) {
-        container.innerHTML = `
-          <div class="picks-empty">
-            <div class="empty-icon">📋</div>
-            <h3>No picks yet</h3>
-            <p>Head to Today's Races to make your picks!</p>
-          </div>`;
-        return;
-      }
+    document.getElementById('autopick-modal').style.display = 'flex';
+  });
 
-      // Fetch all races that have picks (may span multiple dates)
-      const raceIds = [...new Set(allMyPicks.filter(p=>p.horseName).map(p=>p.raceId))];
-      const raceDocs = {};
-      // Load each race doc individually (safe, avoids __name__ query issues)
-      await Promise.all(raceIds.map(async id => {
-        try {
-          const d = await getDoc(doc(db, 'races', id));
-          if (d.exists()) {
-            raceDocs[d.id] = { id: d.id, ...d.data() };
-            allRaceDocs[d.id] = raceDocs[d.id]; // populate cache for updateSummary
-          }
-        } catch(e) {}
-      }));
-      // Refresh summary now that we have full race data
-      updateSummary();
+  document.getElementById('close-autopick-btn').addEventListener('click',
+    () => document.getElementById('autopick-modal').style.display = 'none');
 
-      // Group by date — only include picks where the race was found and has a valid date
-      const byDate = {};
-      allMyPicks.filter(p => p.horseName).forEach(pick => {
-        const race = raceDocs[pick.raceId];
-        if (!race) return; // skip orphaned picks
-        const date = race.date;
-        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return; // skip invalid/missing dates
-        if (!byDate[date]) byDate[date] = [];
-        byDate[date].push({ pick, race });
-      });
+  document.getElementById('apply-autopick-btn').addEventListener('click', async () => {
+    const userId = document.getElementById('autopick-user-select').value;
+    const userName = document.getElementById('autopick-user-select').selectedOptions[0]?.text || 'User';
+    if (!userId) { showToast('Select a user first', 'error'); return; }
 
-      const sortedDates = Object.keys(byDate).sort().reverse();
+    const btn = document.getElementById('apply-autopick-btn');
+    btn.disabled = true; btn.textContent = '⏳ Applying…';
 
-      let totalPoints = 0;
-      let html = '';
+    try {
+      // Get existing picks for this user
+      const existingSnap = await getDocs(query(collection(db,'picks'), where('userId','==',userId)));
+      const existingRaceIds = new Set(existingSnap.docs.map(d => d.data().raceId));
 
-      for (const date of sortedDates) {
-        const items = byDate[date].sort((a,b) => (a.race?.time||'').localeCompare(b.race?.time||''));
-        let dayPoints = 0;
-        items.forEach(({ pick, race }) => {
-          if (race) dayPoints += calcPoints(race, pick.horseName);
+      const rows = document.querySelectorAll('#autopick-results [data-race-id]');
+      let applied = 0, skipped = 0;
+
+      for (const row of rows) {
+        const raceId   = row.dataset.raceId;
+        const horseName = row.dataset.pick;
+        const race = allRaces.find(r => r.id === raceId);
+        if (!race) continue;
+
+        // Skip locked races
+        if (isRaceLocked(race)) { skipped++; continue; }
+
+        // Skip if user already has a pick for this race
+        if (existingRaceIds.has(raceId)) { skipped++; continue; }
+
+        // Write the pick
+        const pickId = `${userId}-${raceId}`;
+        await setDoc(doc(db, 'picks', pickId), {
+          userId,
+          raceId,
+          horseName,
+          date: race.date,
+          pickedAt: new Date().toISOString(),
+          source: 'auto-form'
         });
-        totalPoints += dayPoints;
-
-        const d = new Date(date + 'T12:00:00');
-        const dateLabel = d.toLocaleDateString('en-IE', { weekday:'long', day:'numeric', month:'long' });
-        const venue = items[0]?.race?.venue || '';
-
-        html += `
-          <div class="picks-day-group">
-            <div class="picks-day-header">
-              <div>
-                <div class="picks-day-title">${dateLabel}</div>
-                ${venue ? `<div class="picks-day-venue">🏟️ ${esc(venue)}</div>` : ''}
-              </div>
-              ${dayPoints > 0 ? `<div class="picks-day-points">${dayPoints<0?'-€'+Math.abs(dayPoints).toFixed(2):'+€'+dayPoints.toFixed(2)}</div>` : ''}
-            </div>
-            ${items.map(({ pick, race }) => {
-              if (!race) return '';
-              const outcome = getOutcomeLabel(race, pick.horseName);
-              const pts     = calcPoints(race, pick.horseName, pick.betType || 'ew');
-              let badgeHtml = '';
-              const raceDateTime = (() => {
-                const [h,m] = (race.time||'00:00').split(':').map(Number);
-                const nh = (h>=1&&h<=9)?h+12:h;
-                return new Date(race.date+'T'+String(nh).padStart(2,'0')+':'+String(m).padStart(2,'0')+':00Z');
-              })();
-              const raceIsPast = Date.now() > raceDateTime.getTime();
-              if (!race.result && raceIsPast)  badgeHtml = `<span class="pick-result-badge badge-pending" style="opacity:0.5">No result</span>`;
-              else if (!race.result)            badgeHtml = `<span class="pick-result-badge badge-pending">⏳ Pending</span>`;
-              else if (outcome==='win')   badgeHtml = `<span class="pick-result-badge badge-win">🏆 Won</span>`;
-              else if (outcome==='place') badgeHtml = `<span class="pick-result-badge badge-place">🥈 Placed</span>`;
-              else                        badgeHtml = `<span class="pick-result-badge badge-lose">❌ Lost</span>`;
-
-              return `
-                <div class="pick-row">
-                  <div class="pick-time">${race.time}</div>
-                  <div>
-                    <div class="pick-horse">${esc(pick.horseName)}${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.8rem;font-weight:400;">${r.odds}</span>` : ''; })()} <span style="font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;${pick.betType==='win'?'background:rgba(201,168,76,0.2);color:var(--gold-dark);':'background:rgba(27,77,46,0.1);color:var(--green);'}">${pick.betType==='win'?'WIN':'E/W'}</span></div>
-                    <div class="pick-race">${esc(race.name)}</div>
-                  </div>
-                  ${badgeHtml}
-                  ${pts !== 0 ? `<div class="pick-points ${pts<0?'lost-pts':outcome==='place'?'place-pts':''}">${pts<0?'-€'+Math.abs(pts).toFixed(2):'+€'+pts.toFixed(2)}</div>` : ''}
-                </div>`;
-            }).join('')}
-          </div>`;
+        applied++;
       }
 
-      container.innerHTML = html || `<div class="picks-empty"><div class="empty-icon">📋</div><p>No picks found.</p></div>`;
+      showToast(`✅ ${applied} pick(s) applied for ${userName}${skipped ? ` (${skipped} skipped — locked or already picked)` : ''}`, 'success');
+      btn.textContent = `✅ Done — ${applied} applied`;
+      updateStats();
+    } catch(err) {
+      showToast('❌ ' + err.message, 'error');
+      btn.disabled = false; btn.textContent = '✅ Apply Picks';
+    }
+  });
+
+  // ===== LEADERBOARD =====
+  async function loadLeaderboard() {
+    const el=document.getElementById('leaderboard-list');
+    el.innerHTML='<div class="loading-center"><div class="loading-spinner"></div><span>Loading...</span></div>';
+
+    // Load picks, users, and races fresh — don't depend on allUsers/allRaces being loaded
+    const [picksSnap, usersSnap] = await Promise.all([
+      getDocs(collection(db,'picks')),
+      getDocs(collection(db,'users'))
+    ]);
+    const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
+    const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // Also check 'Users' collection
+    try {
+      const u2 = await getDocs(collection(db,'Users'));
+      u2.docs.forEach(d=>{ if(!users.find(u=>u.id===d.id)) users.push({id:d.id,...d.data()}); });
+    } catch(e){}
+
+    // Fetch ALL races from Firestore in one query (covers all festival days)
+    const racesCache={};
+    try {
+      const allRacesSnap = await getDocs(collection(db,'races'));
+      allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
+    } catch(e) {
+      // Fallback: use allRaces + fetch individually
+      allRaces.forEach(r=>{ racesCache[r.id]=r; });
+      const raceIds=[...new Set(picks.map(p=>p.raceId))];
+      await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
+        try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
+      }));
     }
 
-    // ===== PICK A HORSE =====
-    // Use event delegation so apostrophes/special chars in horse names never break
-    document.getElementById('races-container').addEventListener('click', async (e) => {
-      const card = e.target.closest('.horse-card');
-      if (!card || card.dataset.pickable !== 'true') return;
-      const raceId    = card.dataset.raceId;
-      const horseName = card.dataset.horseName;
-      const race      = allRaces.find(r => r.id === raceId);
-
-      // If already picked this horse — deselect directly (no modal needed)
-      const prev = myPicks[raceId];
-      if (prev?.horseName === horseName) {
-        await pickHorse(raceId, horseName, prev.betType || 'ew');
-        return;
-      }
-
-      // Show bet type modal
-      showBetModal(raceId, horseName, race);
+    const scores={};
+    users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
+      scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
     });
 
-    // Pending pick for modal confirmation
-    let _pendingPick = null;
-
-    function showBetModal(raceId, horseName, race) {
-      _pendingPick = { raceId, horseName };
-      const runner  = (race?.runners||[]).find(r => horseMatch(r.name, horseName));
-      const od      = parseOdds(runner?.odds);
-      const ewDenom = getEwDenom(race);
-      const odStr   = runner?.odds && runner.odds !== 'SP' ? runner.odds : 'SP';
-
-      // Populate modal header
-      document.getElementById('bet-modal-race').textContent  = race?.name || '';
-      document.getElementById('bet-modal-horse').textContent = horseName;
-      document.getElementById('bet-modal-odds').textContent  = odStr !== 'SP' ? odStr : 'Starting Price';
-
-      // Calculate returns
-      if (od && odStr !== 'SP') {
-        const ewWin   = ((od+1)*5 + ((od/ewDenom)+1)*5 - 10);
-        const ewPlace = (((od/ewDenom)+1)*5 - 10);
-        const winOnly = ((od+1)*10 - 10);
-
-        document.getElementById('ew-win-return').textContent   = (ewWin   >= 0 ? '+' : '') + '€' + Math.abs(ewWin).toFixed(2)   + (ewWin < 0 ? ' loss' : '');
-        document.getElementById('ew-win-return').style.color   = ewWin   >= 0 ? 'var(--green)' : 'var(--red)';
-        document.getElementById('ew-place-return').textContent = (ewPlace >= 0 ? '+' : '') + '€' + Math.abs(ewPlace).toFixed(2) + (ewPlace < 0 ? ' loss' : '');
-        document.getElementById('ew-place-return').style.color = ewPlace >= 0 ? 'var(--green)' : 'var(--red)';
-        document.getElementById('win-win-return').textContent  = '+€' + winOnly.toFixed(2);
-      } else {
-        document.getElementById('ew-win-return').textContent   = 'SP';
-        document.getElementById('ew-place-return').textContent = 'SP';
-        document.getElementById('win-win-return').textContent  = 'SP';
+    for (const p of picks){
+      if (!scores[p.userId]) continue; // skip deleted users
+      scores[p.userId].picks++;
+      const race=racesCache[p.raceId];
+      if (!race||!race.result) continue;
+      const {winner,second,third,fourth,fifth}=race.result;
+      const _pts = calcPoints(race, p.horseName, p.betType || 'ew');
+      scores[p.userId].pts += _pts;
+      if (_pts > 0) {
+        if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
+        else scores[p.userId].places++;
       }
-
-      // Highlight currently selected bet type if already picked different horse
-      document.getElementById('bet-ew-btn').style.borderColor  = 'var(--cream-dark)';
-      document.getElementById('bet-win-btn').style.borderColor = 'var(--cream-dark)';
-
-      document.getElementById('bet-modal').style.display = 'flex';
     }
+    const sorted=Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+    if (!sorted.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><h3>No data yet</h3></div>';return;}
+    const medals=['🥇','🥈','🥉'];
+    el.innerHTML=sorted.map((s,i)=>`
+      <div style="display:flex;align-items:center;gap:16px;padding:16px;border-bottom:1px solid var(--cream-dark);${i===0?'background:rgba(201,168,76,0.08);border-radius:10px;':''}">
+        <span style="font-size:1.4rem;width:32px;text-align:center;">${medals[i]||(i+1)}</span>
+        <div class="user-avatar">${(s.name||'U')[0].toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:1.05rem;">${esc(s.name)}</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);">${s.wins} wins · ${s.places} places · ${s.picks} picks</div>
+        </div>
+        <div style="text-align:right;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:var(--green);">€${s.pts.toFixed(2)}<div style="font-size:0.72rem;color:var(--text-muted);font-family:inherit;font-weight:400;">returned</div></div>
+      </div>`).join('');
+  }
 
-    window.confirmPick = async function(betType) {
-      if (!_pendingPick) return;
-      document.getElementById('bet-modal').style.display = 'none';
-      await pickHorse(_pendingPick.raceId, _pendingPick.horseName, betType);
-      _pendingPick = null;
-    };
-
-    async function pickHorse(raceId, horseName, betType = 'ew') {
-      const race = allRaces.find(r => r.id === raceId);
-      if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
-
-      const prev   = myPicks[raceId];
-      const pickId = prev ? prev.id : `${currentUser.uid}-${raceId}`;
-
-      if (prev?.horseName === horseName) {
-        // Deselect
-        delete myPicks[raceId];
-        allMyPicks = allMyPicks.filter(p => p.raceId !== raceId || p.id !== pickId);
-        await setDoc(doc(db,'picks',pickId), { userId:currentUser.uid, raceId, horseName:null, updatedAt:new Date().toISOString() });
-        showToast(`Deselected ${horseName}`, 'info');
-        renderRaces(); updateSummary();
-        return;
-      }
-
-      const betLabel = betType === 'win' ? 'Win Only' : 'Each Way';
-      await setDoc(doc(db,'picks',pickId), {
-        userId: currentUser.uid, raceId, horseName, betType,
-        pickedAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-      });
-
-      const newPick = { id: pickId, userId:currentUser.uid, raceId, horseName, betType };
-      myPicks[raceId] = newPick;
-      allMyPicks = allMyPicks.filter(p => !(p.raceId === raceId)).concat([newPick]);
-      showToast(`✅ ${horseName} — ${betLabel}`, 'success');
-      renderRaces(); updateSummary();
-    };
-
-    // ===== SUMMARY =====
-    // Cache of all race docs fetched for My Picks tab — reused for total points
-    let allRaceDocs = {};
-
-    function updateSummary() {
-      const open   = allRaces.filter(r => !isRaceLocked(r)).length;
-      const picked = Object.values(myPicks).filter(p=>p.horseName).length;
-
-      // Sum points across ALL picks (all dates), not just today
-      let points = 0;
-      for (const pick of allMyPicks) {
-        if (!pick.horseName) continue;
-        // Check today's races first (fast), then allRaceDocs cache
-        const race = allRaces.find(r => r.id === pick.raceId) || allRaceDocs[pick.raceId];
-        if (race) points += calcPoints(race, pick.horseName, pick.betType || 'ew');
-      }
-
-      document.getElementById('summary-races').textContent  = allRaces.length;
-      document.getElementById('summary-picked').textContent = picked;
-      document.getElementById('summary-points').textContent = (points >= 0 ? '€' : '-€') + Math.abs(points).toFixed(2);
-      document.getElementById('summary-open').textContent   = open;
-    }
-
-    // ===== LEADERBOARD =====
-    async function renderLeaderboard() {
-      const el = document.getElementById('leaderboard-container');
-      el.innerHTML = '<div class="loading-center"><div class="loading-spinner"></div><span>Loading…</span></div>';
+  // ===== STATS =====
+  async function updateStats() {
+    document.getElementById('stat-users').textContent=allUsers.filter(u=>u.role==='user').length;
+    document.getElementById('stat-races').textContent=allRaces.length;
+    try {
+      const snap=await getDocs(collection(db,'picks'));
+      document.getElementById('stat-picks').textContent=snap.docs.filter(d=>d.data().horseName).length;
+      // Count results across all races in Firestore, not just today's
       try {
-        const [picksSnap, usersSnap] = await Promise.all([
-          getDocs(collection(db,'picks')),
-          getDocs(collection(db,'users'))
-        ]);
-        const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
-        const users = usersSnap.docs.map(d=>({id:d.id,...d.data()}));
-
-        // Fetch ALL races from Firestore in one query (covers all festival days)
-        const racesCache = {};
-        try {
-          const allRacesSnap = await getDocs(collection(db,'races'));
-          allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
-        } catch(e) {
-          const raceIds=[...new Set(picks.map(p=>p.raceId))];
-          await Promise.all(raceIds.map(async id=>{
-            try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
-          }));
-        }
-
-        const scores = {};
-        users.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
-          scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0,isMe:u.id===currentUser?.uid};
-        });
-
-        for (const p of picks) {
-          if (!scores[p.userId]) continue;
-          scores[p.userId].picks++;
-          const race = racesCache[p.raceId];
-          if (!race||!race.result) continue;
-          const pts = calcPoints(race, p.horseName, p.betType || 'ew');
-          const outcome = getOutcomeLabel(race, p.horseName);
-          scores[p.userId].pts += pts;
-          if (outcome==='win') scores[p.userId].wins++;
-          else if (outcome==='place') scores[p.userId].places++;
-        }
-
-        const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
-        if (!sorted.length) {
-          el.innerHTML='<div class="empty-state"><div class="empty-icon">🏆</div><h3>No results yet</h3><p>Scores will appear once races finish.</p></div>';
-          return;
-        }
-
-        const medals = ['🥇','🥈','🥉'];
-        el.innerHTML = sorted.map((s,i) => `
-          <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--cream-dark);${i===0?'background:rgba(201,168,76,0.08);':''}${s.isMe?'border-left:3px solid var(--green);':''}">
-            <span style="font-size:1.4rem;width:32px;text-align:center;">${medals[i]||(i+1)}</span>
-            <div style="width:38px;height:38px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0;">${(s.name||'U')[0].toUpperCase()}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:1rem;">${esc(s.name)}${s.isMe?' <span style="font-size:0.75rem;color:var(--green);font-weight:600;">(you)</span>':''}</div>
-              <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">€${s.pts.toFixed(2)}</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">returned</div>
-            </div>
-          </div>`).join('');
-      } catch(err) {
-        el.innerHTML = `<div style="padding:20px;color:var(--red);">Could not load leaderboard: ${esc(err.message)}</div>`;
-      }
-    }
-
-    // ===== HELPERS =====
-    function normaliseRaceHour(h) {
-      if (h >= 1 && h <= 9) return h + 12;
-      return h;
-    }
-
-    function isRaceLocked(race) {
-      const [h,m] = (race.time||'00:00').split(':').map(Number);
-      const nh = normaliseRaceHour(h);
-      const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
-      return Date.now() >= rt.getTime() - 30 * 60 * 1000;
-    }
-
-    function getTimeUntil(race) {
-      const [h,m] = (race.time||'00:00').split(':').map(Number);
-      const nh = normaliseRaceHour(h);
-      const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
-      return Math.max(0, rt.getTime() - Date.now() - 30 * 60 * 1000);
-    }
-
-    function formatTimeUntil(ms) {
-      if (ms <= 0) return 'Locking soon…';
-      const mins = Math.floor(ms / 60000);
-      const hrs  = Math.floor(mins / 60);
-      if (hrs > 0) return `Locks in ${hrs}h ${mins % 60}m`;
-      return `Locks in ${mins}m`;
-    }
-
-    function esc(str) {
-      return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
-
-    function showToast(msg, type='info') {
-      const c = document.getElementById('toast-container');
-      const t = document.createElement('div');
-      t.className = `toast ${type}`;
-      t.textContent = msg;
-      c.appendChild(t);
-      setTimeout(() => t.remove(), 3500);
-    }
-
-    window.logout = async function() {
-      await signOut(auth);
-      window.location.href = 'index.html';
-    };
-  </script>
-
-<!-- BET TYPE MODAL -->
-<div id="bet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:var(--white);border-radius:16px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
-    <div style="background:linear-gradient(135deg,var(--green),var(--green-mid));padding:20px 24px;color:white;">
-      <div style="font-size:0.8rem;opacity:0.75;margin-bottom:4px;" id="bet-modal-race"></div>
-      <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;" id="bet-modal-horse"></div>
-      <div style="font-size:1rem;color:var(--gold-light);margin-top:2px;" id="bet-modal-odds"></div>
-    </div>
-    <div style="padding:20px 24px;">
-      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;text-align:center;">Choose your bet type — €10 total stake</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <!-- Each Way -->
-        <button id="bet-ew-btn" onclick="confirmPick('ew')" style="border:2px solid var(--cream-dark);border-radius:12px;padding:16px 12px;background:var(--white);cursor:pointer;text-align:center;transition:all 0.2s;">
-          <div style="font-size:1.1rem;margin-bottom:4px;">🎯</div>
-          <div style="font-weight:700;color:var(--green);font-size:0.95rem;">Each Way</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0;">€5 win + €5 place</div>
-          <div style="margin-top:8px;border-top:1px solid var(--cream-dark);padding-top:8px;">
-            <div style="font-size:0.72rem;color:var(--text-muted);">If wins</div>
-            <div style="font-weight:700;color:var(--green);font-size:0.9rem;" id="ew-win-return">—</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">If places</div>
-            <div style="font-weight:700;font-size:0.9rem;" id="ew-place-return">—</div>
-          </div>
-        </button>
-        <!-- Win Only -->
-        <button id="bet-win-btn" onclick="confirmPick('win')" style="border:2px solid var(--cream-dark);border-radius:12px;padding:16px 12px;background:var(--white);cursor:pointer;text-align:center;transition:all 0.2s;">
-          <div style="font-size:1.1rem;margin-bottom:4px;">🏆</div>
-          <div style="font-weight:700;color:var(--gold-dark);font-size:0.95rem;">Win Only</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0;">€10 on the win</div>
-          <div style="margin-top:8px;border-top:1px solid var(--cream-dark);padding-top:8px;">
-            <div style="font-size:0.72rem;color:var(--text-muted);">If wins</div>
-            <div style="font-weight:700;color:var(--gold-dark);font-size:0.9rem;" id="win-win-return">—</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">If loses</div>
-            <div style="font-weight:700;color:var(--red);font-size:0.9rem;">-€10.00</div>
-          </div>
-        </button>
-      </div>
-      <button onclick="document.getElementById('bet-modal').style.display='none'" style="width:100%;padding:10px;border:1px solid var(--cream-dark);border-radius:8px;background:transparent;cursor:pointer;color:var(--text-muted);font-size:0.85rem;">Cancel</button>
-    </div>
-  </div>
-</div>
-
+        const allRacesSnap = await getDocs(collection(db,'races'));
+        document.getElementById('stat-results').textContent = allRacesSnap.docs.filter(d=>d.data().result).length;
+      } catch(e) { document.getElementById('stat-results').textContent = allRaces.filter(r=>r.result).length; }
+    } catch(e){}
+  }
+</script>
 </body>
 </html>
