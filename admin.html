@@ -350,21 +350,22 @@ const firebaseConfig = {
 
   // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
   // Returns positive (win/place payout), negative (lost = -€10), or 0 (no result yet)
+  // €5 each-way: €5 win + €5 place. Returns NET profit/loss after €10 stake deducted.
   function calcPoints(race, horseName) {
     if (!race.result || !horseName) return 0;
     const places = getRacePlaces(race);
     const { winner, second, third, fourth, fifth } = race.result;
     const runner    = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-    const od        = parseOdds(runner?.odds);  // e.g. 10.0 for 10/1
-    const ewDenom   = getEwDenom(race);          // 4 = 1/4 odds, 5 = 1/5 odds
-    const WIN_STAKE   = 5;  // €5 on win
-    const PLACE_STAKE = 5;  // €5 on place
-    const TOTAL_STAKE = WIN_STAKE + PLACE_STAKE; // €10 total outlay
+    const od        = parseOdds(runner?.odds);
+    const ewDenom   = getEwDenom(race);
+    const WIN_STAKE   = 5;
+    const PLACE_STAKE = 5;
+    const TOTAL_STAKE = 10;
     if (horseMatch(horseName, winner)) {
-      // Win: both win and place parts pay out
+      // Win: both parts pay, minus total stake = net profit
       const winReturn   = (od + 1) * WIN_STAKE;
       const placeReturn = ((od / ewDenom) + 1) * PLACE_STAKE;
-      return Math.round((winReturn + placeReturn) * 100) / 100;
+      return Math.round((winReturn + placeReturn - TOTAL_STAKE) * 100) / 100;
     }
     const placed =
       (places >= 2 && horseMatch(horseName, second)) ||
@@ -372,12 +373,12 @@ const firebaseConfig = {
       (places >= 4 && horseMatch(horseName, fourth)) ||
       (places >= 5 && horseMatch(horseName, fifth));
     if (placed) {
-      // Place only: win stake lost, place stake returns at fraction odds
-      return Math.round(((od / ewDenom) + 1) * PLACE_STAKE * 100) / 100;
+      // Place: only place part pays, win stake lost = net profit/loss
+      return Math.round(((od / ewDenom) + 1) * PLACE_STAKE * 100) / 100 - TOTAL_STAKE;
     }
-    // Lost: full stake gone
     return -TOTAL_STAKE;
   }
+
 
   function showToast(msg, type='info') {
     const c = document.getElementById('toast-container');

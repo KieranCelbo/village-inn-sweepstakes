@@ -597,6 +597,7 @@ const firebaseConfig = {
     }
 
     // €5 each-way: €5 win + €5 place. Returns full payout, partial payout, or -€10 for loss.
+    // €5 each-way: €5 win + €5 place. Returns NET profit/loss after €10 stake deducted.
     function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
       const places = getRacePlaces(race);
@@ -608,14 +609,18 @@ const firebaseConfig = {
       const PLACE_STAKE = 5;
       const TOTAL_STAKE = 10;
       if (horseMatch(horseName, winner)) {
-        return Math.round(((od+1)*WIN_STAKE + ((od/ewDenom)+1)*PLACE_STAKE) * 100) / 100;
+        // Win: both parts pay, minus total stake = net profit
+        return Math.round(((od+1)*WIN_STAKE + ((od/ewDenom)+1)*PLACE_STAKE - TOTAL_STAKE) * 100) / 100;
       }
       const placed =
         (places >= 2 && horseMatch(horseName, second)) ||
         (places >= 3 && horseMatch(horseName, third))  ||
         (places >= 4 && horseMatch(horseName, fourth)) ||
         (places >= 5 && horseMatch(horseName, fifth));
-      if (placed) return Math.round(((od/ewDenom)+1)*PLACE_STAKE * 100) / 100;
+      if (placed) {
+        // Place: only place part pays, win stake lost = net profit/loss
+        return Math.round(((od/ewDenom)+1)*PLACE_STAKE * 100) / 100 - TOTAL_STAKE;
+      }
       return -TOTAL_STAKE;
     }
 
