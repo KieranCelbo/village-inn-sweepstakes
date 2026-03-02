@@ -109,14 +109,7 @@
     </div>
 
     <!-- Leaderboard on Users tab -->
-    <div class="card" style="margin-top:20px;">
-      <div class="card-header">
-        <div><h2>🏆 Leaderboard</h2><p>Cumulative standings across all festival days</p></div>
-      </div>
-      <div class="card-body">
-        <div id="users-leaderboard"><div class="loading-center"><div class="loading-spinner"></div><span>Calculating…</span></div></div>
-      </div>
-    </div>
+    
   </div>
 
   <!-- RACES TAB -->
@@ -385,7 +378,7 @@ const firebaseConfig = {
     const correctedH = normaliseRaceHour(h);
     const raceStr = race.date + 'T' + String(correctedH).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z';
     const rt = new Date(raceStr);
-    return Date.now() >= rt.getTime() - 30 * 60 * 1000;
+    return Date.now() >= rt.getTime() - 10 * 60 * 1000;
   }
 
   async function getUserProfile(uid) {
@@ -413,7 +406,7 @@ const firebaseConfig = {
   async function init() {
     try {
       await Promise.all([loadUsers(), loadRaces()]);
-      loadResults(); loadLeaderboard(); updateStats();
+      loadResults(); updateStats();
     } catch(err) {
       console.error(err);
       showToast('❌ '+err.message+' — Check Firestore Rules are published in Firebase Console', 'error');
@@ -478,66 +471,6 @@ const firebaseConfig = {
     loadUsersTabLeaderboard();
   }
 
-  async function loadUsersTabLeaderboard() {
-    const el = document.getElementById('users-leaderboard');
-    if (!el) return;
-    try {
-      const picksSnap = await getDocs(collection(db,'picks'));
-      const picks = picksSnap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.horseName&&p.raceId);
-      // Fetch ALL races from Firestore in one query (covers all festival days)
-      const racesCache = {};
-      try {
-        const allRacesSnap = await getDocs(collection(db,'races'));
-        allRacesSnap.docs.forEach(d=>{ racesCache[d.id]={id:d.id,...d.data()}; });
-      } catch(e) {
-        allRaces.forEach(r=>{ racesCache[r.id]=r; });
-        const raceIds=[...new Set(picks.map(p=>p.raceId))];
-        await Promise.all(raceIds.filter(id=>!racesCache[id]).map(async id=>{
-          try { const d=await getDoc(doc(db,'races',id)); if(d.exists()) racesCache[d.id]={id:d.id,...d.data()}; } catch(e2){}
-        }));
-      }
-
-      const scores = {};
-      allUsers.filter(u=>u.role==='user'||u.role==='player').forEach(u=>{
-        scores[u.id]={name:u.displayName||u.username||'Unknown',pts:0,wins:0,places:0,picks:0};
-      });
-
-      for (const p of picks) {
-        if (!scores[p.userId]) continue;
-        scores[p.userId].picks++;
-        const race = racesCache[p.raceId];
-        if (!race||!race.result) continue;
-        const n = (race.runners||[]).length;
-        const {winner,second,third,fourth,fifth} = race.result;
-        const _pts = calcPoints(race, p.horseName);
-        scores[p.userId].pts += _pts;
-        if (_pts > 0) {
-          if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
-          else scores[p.userId].places++;
-        }
-      }
-
-      const sorted = Object.values(scores).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
-      const medals = ['🥇','🥈','🥉'];
-      el.innerHTML = !sorted.length
-        ? '<div class="empty-state"><div class="empty-icon">📊</div><h3>No results yet</h3></div>'
-        : `<div class="table-wrapper"><table>
-            <thead><tr><th>Pos</th><th>Player</th><th>Wins</th><th>Places</th><th>Picks</th><th>Returned</th></tr></thead>
-            <tbody>${sorted.map((s,i)=>`
-              <tr style="${i===0?'background:rgba(201,168,76,0.08);font-weight:600;':''}">
-                <td style="font-size:1.1rem;">${medals[i]||(i+1)}</td>
-                <td><div class="user-info"><div class="user-avatar" style="width:32px;height:32px;font-size:0.85rem;">${(s.name||'U')[0].toUpperCase()}</div>
-                  <span>${esc(s.name)}</span></div></td>
-                <td><span class="badge badge-gold">${s.wins}</span></td>
-                <td><span class="badge badge-green">${s.places}</span></td>
-                <td style="color:var(--text-muted)">${s.picks}</td>
-                <td><strong style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);">${s.pts}pts</strong></td>
-              </tr>`).join('')}
-            </tbody></table></div>`;
-    } catch(e) {
-      el.innerHTML = '<div style="padding:16px;color:var(--red);">Could not load leaderboard</div>';
-    }
-  }
 
   document.getElementById('cleanup-picks-btn').addEventListener('click', async function() {
     this.disabled = true; this.textContent = '⏳ Checking…';
@@ -1261,7 +1194,7 @@ const firebaseConfig = {
     }
     showToast('Override applied','success');
     document.getElementById('override-modal').style.display='none';
-    await loadRaces(); loadResults(); loadLeaderboard(); updateStats();
+    await loadRaces(); loadResults(); updateStats();
   });
 
   // ===== AUTO-PICK BY FORM =====

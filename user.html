@@ -1049,14 +1049,14 @@ const firebaseConfig = {
       const [h,m] = (race.time||'00:00').split(':').map(Number);
       const nh = normaliseRaceHour(h);
       const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
-      return Date.now() >= rt.getTime() - 30 * 60 * 1000;
+      return Date.now() >= rt.getTime() - 10 * 60 * 1000;
     }
 
     function getTimeUntil(race) {
       const [h,m] = (race.time||'00:00').split(':').map(Number);
       const nh = normaliseRaceHour(h);
       const rt = new Date(race.date + 'T' + String(nh).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':00Z');
-      return Math.max(0, rt.getTime() - Date.now() - 30 * 60 * 1000);
+      return Math.max(0, rt.getTime() - Date.now() - 10 * 60 * 1000);
     }
 
     function formatTimeUntil(ms) {
