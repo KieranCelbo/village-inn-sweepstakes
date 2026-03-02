@@ -350,33 +350,16 @@ const firebaseConfig = {
     return r ? r.ew_denom : 4;
   }
 
-  // Calculate euro return for a €5 each-way pick (€5 win + €5 place)
-  // Returns positive (win/place payout), negative (lost = -€10), or 0 (no result yet)
-  // Calculate net profit/loss. betType: 'ew' = €5/€5, 'win' = €10 win only
-  function calcPoints(race, horseName, betType = 'ew') {
+  // Points: 1st=7, 2nd=4, 3rd=2, 4th=1 (if paid)
+  function calcPoints(race, horseName) {
     if (!race.result || !horseName) return 0;
-    const places  = getRacePlaces(race);
+    const places = getRacePlaces(race);
     const { winner, second, third, fourth, fifth } = race.result;
-    const runner  = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-    const od      = parseOdds(runner?.odds);
-    const ewDenom = getEwDenom(race);
-    const STAKE   = 10;
-
-    const isWinner = horseMatch(horseName, winner);
-    const isPlaced =
-      (places >= 2 && horseMatch(horseName, second)) ||
-      (places >= 3 && horseMatch(horseName, third))  ||
-      (places >= 4 && horseMatch(horseName, fourth)) ||
-      (places >= 5 && horseMatch(horseName, fifth));
-
-    if (betType === 'win') {
-      if (isWinner) return Math.round(((od+1)*STAKE - STAKE) * 100) / 100;
-      return -STAKE;
-    } else {
-      if (isWinner) return Math.round(((od+1)*5 + ((od/ewDenom)+1)*5 - STAKE) * 100) / 100;
-      if (isPlaced) return Math.round(((od/ewDenom)+1)*5*100)/100 - STAKE;
-      return -STAKE;
-    }
+    if (horseMatch(horseName, winner))                              return 7;
+    if (places >= 2 && horseMatch(horseName, second))              return 4;
+    if (places >= 3 && horseMatch(horseName, third))               return 2;
+    if (places >= 4 && horseMatch(horseName, fourth))              return 1;
+    return 0;
   }
 
 
@@ -526,7 +509,7 @@ const firebaseConfig = {
         if (!race||!race.result) continue;
         const n = (race.runners||[]).length;
         const {winner,second,third,fourth,fifth} = race.result;
-        const _pts = calcPoints(race, p.horseName, p.betType || 'ew');
+        const _pts = calcPoints(race, p.horseName);
         scores[p.userId].pts += _pts;
         if (_pts > 0) {
           if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
@@ -548,7 +531,7 @@ const firebaseConfig = {
                 <td><span class="badge badge-gold">${s.wins}</span></td>
                 <td><span class="badge badge-green">${s.places}</span></td>
                 <td style="color:var(--text-muted)">${s.picks}</td>
-                <td><strong style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);">€${s.pts.toFixed(2)}</strong></td>
+                <td><strong style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);">${s.pts}pts</strong></td>
               </tr>`).join('')}
             </tbody></table></div>`;
     } catch(e) {
@@ -895,7 +878,7 @@ const firebaseConfig = {
 
       // Log what courses came back so we can debug venue matching
       const courses = [...new Set(results.map(r=>r.course).filter(Boolean))];
-      console.log('API courses returned:', courses);
+      console.log('API courses total pts:', courses);
       console.log('Active meeting venue:', activeMeeting.venue);
 
       const vr = results.filter(r => venueMatch(r.course||'', activeMeeting.venue));
@@ -1110,8 +1093,8 @@ const firebaseConfig = {
           const outcomeLabel = (pick) => {
             if (!hasResult) return '<span class="badge badge-grey">Pending</span>';
             const {winner,second,third,fourth} = race.result;
-            const _pts = calcPoints(race, pick.horseName, pick.betType || 'ew');
-            const _ptsStr = _pts > 0 ? ` +€${_pts.toFixed(2)}` : _pts < 0 ? ` -€${Math.abs(_pts).toFixed(2)}` : '';
+            const _pts = calcPoints(race, pick.horseName);
+            const _ptsStr = _pts > 0 ? ` +${_pts}pts` : '';
             if (horseMatch(pick.horseName,winner)) return `<span class="badge badge-gold">🏆 Won${_ptsStr}</span>`;
             if (places>=2&&horseMatch(pick.horseName,second)) return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥈 Placed${_ptsStr}</span>`;
             if (places>=3&&horseMatch(pick.horseName,third))  return `<span class="badge" style="background:rgba(192,128,0,0.15);color:#a07000;">🥉 Placed${_ptsStr}</span>`;
@@ -1141,7 +1124,7 @@ const firebaseConfig = {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()} <span style="font-size:0.7rem;padding:1px 5px;border-radius:6px;font-weight:700;${pick.betType==='win'?'background:rgba(201,168,76,0.2);color:var(--gold-dark);':'background:rgba(27,77,46,0.1);color:var(--green);'}">${pick.betType==='win'?'WIN':'E/W'}</span></td>
+                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()}</td>
                       <td>${outcomeLabel(pick)}</td>
                     </tr>`;
                   }).join('')}
@@ -1480,7 +1463,7 @@ const firebaseConfig = {
       const race=racesCache[p.raceId];
       if (!race||!race.result) continue;
       const {winner,second,third,fourth,fifth}=race.result;
-      const _pts = calcPoints(race, p.horseName, p.betType || 'ew');
+      const _pts = calcPoints(race, p.horseName);
       scores[p.userId].pts += _pts;
       if (_pts > 0) {
         if (horseMatch(p.horseName, winner)) scores[p.userId].wins++;
@@ -1498,7 +1481,7 @@ const firebaseConfig = {
           <div style="font-weight:700;font-size:1.05rem;">${esc(s.name)}</div>
           <div style="font-size:0.82rem;color:var(--text-muted);">${s.wins} wins · ${s.places} places · ${s.picks} picks</div>
         </div>
-        <div style="text-align:right;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:var(--green);">€${s.pts.toFixed(2)}<div style="font-size:0.72rem;color:var(--text-muted);font-family:inherit;font-weight:400;">returned</div></div>
+        <div style="text-align:right;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:900;color:var(--green);">${s.pts}pts<div style="font-size:0.72rem;color:var(--text-muted);font-family:inherit;font-weight:400;">total pts</div></div>
       </div>`).join('');
   }
 

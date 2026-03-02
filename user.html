@@ -289,11 +289,6 @@
     }
     .points-badge.place-points { background: #c08000; }
 
-    /* ===== BET MODAL ===== */
-    #bet-ew-btn:hover  { border-color: var(--green) !important; background: rgba(27,77,46,0.05) !important; }
-    #bet-win-btn:hover { border-color: var(--gold-dark) !important; background: rgba(201,168,76,0.05) !important; }
-    #bet-ew-btn:active, #bet-win-btn:active { transform: scale(0.97); }
-
     /* ===== MY PICKS TAB ===== */
     .picks-day-group {
       background: var(--white);
@@ -501,12 +496,11 @@
       <div class="scoring-info">
         <strong>📊 How it works:</strong>
         <div class="scoring-grid">
-          <div class="scoring-rule"><span class="scoring-pts">€5 E/W</span> €5 win + €5 place per pick</div>
-          <div class="scoring-rule"><span class="scoring-pts">Win</span> Full payout on both parts</div>
-          <div class="scoring-rule"><span class="scoring-pts">Place</span> Place part pays at 1/4 or 1/5 odds</div>
-          <div class="scoring-rule"><span class="scoring-pts" style="color:var(--red);">Lose</span> -€10 deducted</div>
-        </div>
-      </div>
+          <div class="scoring-rule"><span class="scoring-pts">7pts</span> 1st place</div>
+          <div class="scoring-rule"><span class="scoring-pts">4pts</span> 2nd place</div>
+          <div class="scoring-rule"><span class="scoring-pts">2pts</span> 3rd place</div>
+          <div class="scoring-rule"><span class="scoring-pts">1pt</span> 4th (if paid)</div>
+          <div class="scoring-rule"><span class="scoring-pts">0pts</span> Unplaced</div>>
       <div id="races-container">
         <div class="loading-center">
           <div class="loading-spinner"></div>
@@ -601,36 +595,16 @@ const firebaseConfig = {
       return r ? r.ew_denom : 4;
     }
 
-    // €5 each-way: €5 win + €5 place. Returns full payout, partial payout, or -€10 for loss.
-    // Calculate net profit/loss for a pick
-    // betType: 'ew' = €5 win + €5 place, 'win' = €10 win only
-    // Existing picks without betType default to 'ew'
-    function calcPoints(race, horseName, betType = 'ew') {
+    // Points system: 1st=7pts, 2nd=4pts, 3rd=2pts, 4th=1pt (if paid)
+    function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
       const places  = getRacePlaces(race);
       const { winner, second, third, fourth, fifth } = race.result;
-      const runner  = (race.runners||[]).find(r => horseMatch(r.name, horseName));
-      const od      = parseOdds(runner?.odds);
-      const ewDenom = getEwDenom(race);
-      const STAKE   = 10; // total stake always €10
-
-      const isWinner = horseMatch(horseName, winner);
-      const isPlaced =
-        (places >= 2 && horseMatch(horseName, second)) ||
-        (places >= 3 && horseMatch(horseName, third))  ||
-        (places >= 4 && horseMatch(horseName, fourth)) ||
-        (places >= 5 && horseMatch(horseName, fifth));
-
-      if (betType === 'win') {
-        // Win only: €10 on win — only pays if wins
-        if (isWinner) return Math.round(((od+1)*STAKE - STAKE) * 100) / 100;
-        return -STAKE;
-      } else {
-        // Each way: €5 win + €5 place
-        if (isWinner) return Math.round(((od+1)*5 + ((od/ewDenom)+1)*5 - STAKE) * 100) / 100;
-        if (isPlaced) return Math.round(((od/ewDenom)+1)*5*100)/100 - STAKE;
-        return -STAKE;
-      }
+      if (horseMatch(horseName, winner))                              return 7;
+      if (places >= 2 && horseMatch(horseName, second))              return 4;
+      if (places >= 3 && horseMatch(horseName, third))               return 2;
+      if (places >= 4 && horseMatch(horseName, fourth))              return 1;
+      return 0;
     }
 
     function getOutcomeLabel(race, horseName) {
@@ -760,20 +734,21 @@ const firebaseConfig = {
             <span>🏆</span>
             <span class="winner-label">${esc(race.result.winner)}</span>
             ${placeList.map(p => `<span class="place-label">${p}</span>`).join('')}
-            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +€${pts.toFixed(2)}</span>` : ''}
-            ${outcome === 'place' ? `<span class="pick-outcome-place">🥈 Placed! +€${pts.toFixed(2)}</span>` : ''}
-            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ Lost -€10.00</span>` : ''}
-            ${pts !== 0 ? `<span class="points-badge ${pts<0?'lost-points':outcome==='place'?'place-points':''}">${pts<0?'-€'+Math.abs(pts).toFixed(2):'+€'+pts.toFixed(2)}</span>` : ''}
+            ${outcome === 'win'   ? `<span class="pick-outcome-win">🎉 Winner! +7pts</span>` : ''}
+            ${outcome === 'place' && pts === 4 ? `<span class="pick-outcome-place">🥈 2nd! +4pts</span>` : ''}
+            ${outcome === 'place' && pts === 2 ? `<span class="pick-outcome-place">🥉 3rd! +2pts</span>` : ''}
+            ${outcome === 'place' && pts === 1 ? `<span class="pick-outcome-place">4️⃣ 4th! +1pt</span>` : ''}
+            ${outcome === 'lose'  ? `<span class="pick-outcome-lose">❌ No points</span>` : ''}
+            ${pts > 0 ? `<span class="points-badge ${outcome==='place'?'place-points':''}">${pts}pts</span>` : ''}
           </div>`;
       }
 
-      // Place hint — uses Bet365 ew_places where available
-      const paidPlaces = getRacePlaces(race) - 1;
-      const ewDenom = getEwDenom(race);
-      const placeHint = paidPlaces + ' place' + (paidPlaces !== 1 ? 's' : '') + (race.extraPlace ? ' +extra' : '');
+      // Place hint — number of places that score points
+      const racePlaces = getRacePlaces(race);
+      const placeHint = racePlaces + ' place' + (racePlaces !== 1 ? 's' : '');
 
       const horsesHtml = locked
-        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? (() => { const r = (race.runners||[]).find(r => horseMatch(r.name, myPick.horseName)); const oddsStr = r?.odds ? ` (${r.odds})` : ''; const betBadge = myPick.betType === 'win' ? ' <span style="background:var(--gold);color:var(--dark);font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;">WIN</span>' : ' <span style="background:var(--green);color:white;font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;">E/W</span>'; return ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong><span style="color:var(--text-muted);font-weight:400;">${oddsStr}</span>${betBadge}`; })() : ' — no pick made'}</div>`
+        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? (() => { const r = (race.runners||[]).find(r => horseMatch(r.name, myPick.horseName)); const oddsStr = r?.odds ? ` <span style="color:var(--text-muted);font-weight:400;">(${r.odds})</span>` : ''; return ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>${oddsStr}`; })() : ' — no pick made'}</div>`
         : `<div class="horses-grid">
             ${(race.runners || []).map(horse => {
               const isPicked = myPick?.horseName === horse.name;
@@ -789,12 +764,8 @@ const firebaseConfig = {
                   ${isNR ? `<div class="horse-nr">Non-Runner</div>` : (() => {
                     const _odds = horse.odds && horse.odds !== 'SP' ? horse.odds : null;
                     const _od = _odds ? parseOdds(_odds) : null;
-                    const _winPts   = _od !== null ? Math.round((_od + 1) * 10) : null;
-                    const _placePts = _od !== null ? Math.round((_od / ewDenom + 1) * 5) : null;
-
                     return (_odds
-                      ? `<div class="horse-odds">${_odds}</div>
-                         <div class="horse-potential">Win: €${(((_od+1)*5)+((_od/ewDenom+1)*5)).toFixed(2)} · Place: €${((_od/ewDenom+1)*5).toFixed(2)}</div>`
+                      ? `<div class="horse-odds">${_odds}</div>`
                       : `<div class="horse-odds" style="color:var(--text-muted);font-size:0.9rem;">SP</div>`)
                       + (horse.form ? `<div class="horse-form">Form: ${esc(horse.form)}</div>` : '');
                   })()}
@@ -823,7 +794,7 @@ const firebaseConfig = {
             <div class="race-status-area">
               ${locked
                 ? `<span class="lock-badge">🔒 Locked</span>
-                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)} <span style="font-size:0.7rem;opacity:0.8;">${myPick.betType==='win'?'WIN':'E/W'}</span></div>` : ''}`
+                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)}</div>` : ''}`
                 : `<span class="lock-badge open">🟢 Open</span>
                    <span class="countdown ${urgent?'urgent':''}">${formatTimeUntil(timeUntil)}</span>`}
             </div>
@@ -897,12 +868,12 @@ const firebaseConfig = {
                 <div class="picks-day-title">${dateLabel}</div>
                 ${venue ? `<div class="picks-day-venue">🏟️ ${esc(venue)}</div>` : ''}
               </div>
-              ${dayPoints > 0 ? `<div class="picks-day-points">${dayPoints<0?'-€'+Math.abs(dayPoints).toFixed(2):'+€'+dayPoints.toFixed(2)}</div>` : ''}
+              ${dayPoints > 0 ? `<div class="picks-day-points">${dayPoints}pts</div>` : ''}
             </div>
             ${items.map(({ pick, race }) => {
               if (!race) return '';
               const outcome = getOutcomeLabel(race, pick.horseName);
-              const pts     = calcPoints(race, pick.horseName, pick.betType || 'ew');
+              const pts     = calcPoints(race, pick.horseName);
               let badgeHtml = '';
               const raceDateTime = (() => {
                 const [h,m] = (race.time||'00:00').split(':').map(Number);
@@ -920,11 +891,11 @@ const firebaseConfig = {
                 <div class="pick-row">
                   <div class="pick-time">${race.time}</div>
                   <div>
-                    <div class="pick-horse">${esc(pick.horseName)}${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.8rem;font-weight:400;">${r.odds}</span>` : ''; })()} <span style="font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;${pick.betType==='win'?'background:rgba(201,168,76,0.2);color:var(--gold-dark);':'background:rgba(27,77,46,0.1);color:var(--green);'}">${pick.betType==='win'?'WIN':'E/W'}</span></div>
+                    <div class="pick-horse">${esc(pick.horseName)}${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.8rem;font-weight:400;">${r.odds}</span>` : ''; })()}</div>
                     <div class="pick-race">${esc(race.name)}</div>
                   </div>
                   ${badgeHtml}
-                  ${pts !== 0 ? `<div class="pick-points ${pts<0?'lost-pts':outcome==='place'?'place-pts':''}">${pts<0?'-€'+Math.abs(pts).toFixed(2):'+€'+pts.toFixed(2)}</div>` : ''}
+                  ${pts !== 0 ? `<div class="pick-points ${pts<0?'lost-pts':outcome==='place'?'place-pts':''}">${pts}pts</div>` : ''}
                 </div>`;
             }).join('')}
           </div>`;
@@ -938,68 +909,10 @@ const firebaseConfig = {
     document.getElementById('races-container').addEventListener('click', async (e) => {
       const card = e.target.closest('.horse-card');
       if (!card || card.dataset.pickable !== 'true') return;
-      const raceId    = card.dataset.raceId;
-      const horseName = card.dataset.horseName;
-      const race      = allRaces.find(r => r.id === raceId);
-
-      // If already picked this horse — deselect directly (no modal needed)
-      const prev = myPicks[raceId];
-      if (prev?.horseName === horseName) {
-        await pickHorse(raceId, horseName, prev.betType || 'ew');
-        return;
-      }
-
-      // Show bet type modal
-      showBetModal(raceId, horseName, race);
+      await pickHorse(card.dataset.raceId, card.dataset.horseName);
     });
 
-    // Pending pick for modal confirmation
-    let _pendingPick = null;
-
-    function showBetModal(raceId, horseName, race) {
-      _pendingPick = { raceId, horseName };
-      const runner  = (race?.runners||[]).find(r => horseMatch(r.name, horseName));
-      const od      = parseOdds(runner?.odds);
-      const ewDenom = getEwDenom(race);
-      const odStr   = runner?.odds && runner.odds !== 'SP' ? runner.odds : 'SP';
-
-      // Populate modal header
-      document.getElementById('bet-modal-race').textContent  = race?.name || '';
-      document.getElementById('bet-modal-horse').textContent = horseName;
-      document.getElementById('bet-modal-odds').textContent  = odStr !== 'SP' ? odStr : 'Starting Price';
-
-      // Calculate returns
-      if (od && odStr !== 'SP') {
-        const ewWin   = ((od+1)*5 + ((od/ewDenom)+1)*5 - 10);
-        const ewPlace = (((od/ewDenom)+1)*5 - 10);
-        const winOnly = ((od+1)*10 - 10);
-
-        document.getElementById('ew-win-return').textContent   = (ewWin   >= 0 ? '+' : '') + '€' + Math.abs(ewWin).toFixed(2)   + (ewWin < 0 ? ' loss' : '');
-        document.getElementById('ew-win-return').style.color   = ewWin   >= 0 ? 'var(--green)' : 'var(--red)';
-        document.getElementById('ew-place-return').textContent = (ewPlace >= 0 ? '+' : '') + '€' + Math.abs(ewPlace).toFixed(2) + (ewPlace < 0 ? ' loss' : '');
-        document.getElementById('ew-place-return').style.color = ewPlace >= 0 ? 'var(--green)' : 'var(--red)';
-        document.getElementById('win-win-return').textContent  = '+€' + winOnly.toFixed(2);
-      } else {
-        document.getElementById('ew-win-return').textContent   = 'SP';
-        document.getElementById('ew-place-return').textContent = 'SP';
-        document.getElementById('win-win-return').textContent  = 'SP';
-      }
-
-      // Highlight currently selected bet type if already picked different horse
-      document.getElementById('bet-ew-btn').style.borderColor  = 'var(--cream-dark)';
-      document.getElementById('bet-win-btn').style.borderColor = 'var(--cream-dark)';
-
-      document.getElementById('bet-modal').style.display = 'flex';
-    }
-
-    window.confirmPick = async function(betType) {
-      if (!_pendingPick) return;
-      document.getElementById('bet-modal').style.display = 'none';
-      await pickHorse(_pendingPick.raceId, _pendingPick.horseName, betType);
-      _pendingPick = null;
-    };
-
-    async function pickHorse(raceId, horseName, betType = 'ew') {
+    async function pickHorse(raceId, horseName) {
       const race = allRaces.find(r => r.id === raceId);
       if (!race || isRaceLocked(race)) { showToast('⏰ This race is locked!', 'error'); return; }
 
@@ -1016,16 +929,15 @@ const firebaseConfig = {
         return;
       }
 
-      const betLabel = betType === 'win' ? 'Win Only' : 'Each Way';
       await setDoc(doc(db,'picks',pickId), {
-        userId: currentUser.uid, raceId, horseName, betType,
+        userId: currentUser.uid, raceId, horseName,
         pickedAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
 
-      const newPick = { id: pickId, userId:currentUser.uid, raceId, horseName, betType };
+      const newPick = { id: pickId, userId:currentUser.uid, raceId, horseName };
       myPicks[raceId] = newPick;
       allMyPicks = allMyPicks.filter(p => !(p.raceId === raceId)).concat([newPick]);
-      showToast(`✅ ${horseName} — ${betLabel}`, 'success');
+      showToast(`✅ Picked: ${horseName}`, 'success');
       renderRaces(); updateSummary();
     };
 
@@ -1043,12 +955,12 @@ const firebaseConfig = {
         if (!pick.horseName) continue;
         // Check today's races first (fast), then allRaceDocs cache
         const race = allRaces.find(r => r.id === pick.raceId) || allRaceDocs[pick.raceId];
-        if (race) points += calcPoints(race, pick.horseName, pick.betType || 'ew');
+        if (race) points += calcPoints(race, pick.horseName);
       }
 
       document.getElementById('summary-races').textContent  = allRaces.length;
       document.getElementById('summary-picked').textContent = picked;
-      document.getElementById('summary-points').textContent = (points >= 0 ? '€' : '-€') + Math.abs(points).toFixed(2);
+      document.getElementById('summary-points').textContent = points + 'pts';
       document.getElementById('summary-open').textContent   = open;
     }
 
@@ -1086,7 +998,7 @@ const firebaseConfig = {
           scores[p.userId].picks++;
           const race = racesCache[p.raceId];
           if (!race||!race.result) continue;
-          const pts = calcPoints(race, p.horseName, p.betType || 'ew');
+          const pts = calcPoints(race, p.horseName);
           const outcome = getOutcomeLabel(race, p.horseName);
           scores[p.userId].pts += pts;
           if (outcome==='win') scores[p.userId].wins++;
@@ -1109,8 +1021,8 @@ const firebaseConfig = {
               <div style="font-size:0.8rem;color:var(--text-muted);">${s.wins} win${s.wins!==1?'s':''} · ${s.places} place${s.places!==1?'s':''} · ${s.picks} pick${s.picks!==1?'s':''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">€${s.pts.toFixed(2)}</div>
-              <div style="font-size:0.72rem;color:var(--text-muted);">returned</div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;color:var(--green);line-height:1;">${s.pts}pts</div>
+              <div style="font-size:0.72rem;color:var(--text-muted);">pts</div>
             </div>
           </div>`).join('');
       } catch(err) {
@@ -1164,47 +1076,6 @@ const firebaseConfig = {
       window.location.href = 'index.html';
     };
   </script>
-
-<!-- BET TYPE MODAL -->
-<div id="bet-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:var(--white);border-radius:16px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
-    <div style="background:linear-gradient(135deg,var(--green),var(--green-mid));padding:20px 24px;color:white;">
-      <div style="font-size:0.8rem;opacity:0.75;margin-bottom:4px;" id="bet-modal-race"></div>
-      <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:700;" id="bet-modal-horse"></div>
-      <div style="font-size:1rem;color:var(--gold-light);margin-top:2px;" id="bet-modal-odds"></div>
-    </div>
-    <div style="padding:20px 24px;">
-      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;text-align:center;">Choose your bet type — €10 total stake</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <!-- Each Way -->
-        <button id="bet-ew-btn" onclick="confirmPick('ew')" style="border:2px solid var(--cream-dark);border-radius:12px;padding:16px 12px;background:var(--white);cursor:pointer;text-align:center;transition:all 0.2s;">
-          <div style="font-size:1.1rem;margin-bottom:4px;">🎯</div>
-          <div style="font-weight:700;color:var(--green);font-size:0.95rem;">Each Way</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0;">€5 win + €5 place</div>
-          <div style="margin-top:8px;border-top:1px solid var(--cream-dark);padding-top:8px;">
-            <div style="font-size:0.72rem;color:var(--text-muted);">If wins</div>
-            <div style="font-weight:700;color:var(--green);font-size:0.9rem;" id="ew-win-return">—</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">If places</div>
-            <div style="font-weight:700;font-size:0.9rem;" id="ew-place-return">—</div>
-          </div>
-        </button>
-        <!-- Win Only -->
-        <button id="bet-win-btn" onclick="confirmPick('win')" style="border:2px solid var(--cream-dark);border-radius:12px;padding:16px 12px;background:var(--white);cursor:pointer;text-align:center;transition:all 0.2s;">
-          <div style="font-size:1.1rem;margin-bottom:4px;">🏆</div>
-          <div style="font-weight:700;color:var(--gold-dark);font-size:0.95rem;">Win Only</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:4px 0;">€10 on the win</div>
-          <div style="margin-top:8px;border-top:1px solid var(--cream-dark);padding-top:8px;">
-            <div style="font-size:0.72rem;color:var(--text-muted);">If wins</div>
-            <div style="font-weight:700;color:var(--gold-dark);font-size:0.9rem;" id="win-win-return">—</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">If loses</div>
-            <div style="font-weight:700;color:var(--red);font-size:0.9rem;">-€10.00</div>
-          </div>
-        </button>
-      </div>
-      <button onclick="document.getElementById('bet-modal').style.display='none'" style="width:100%;padding:10px;border:1px solid var(--cream-dark);border-radius:8px;background:transparent;cursor:pointer;color:var(--text-muted);font-size:0.85rem;">Cancel</button>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
