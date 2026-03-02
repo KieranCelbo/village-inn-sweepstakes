@@ -468,7 +468,6 @@ const firebaseConfig = {
       </tbody></table></div>`;
     el.querySelectorAll('[data-action="resetpw"]').forEach(b=>b.addEventListener('click',()=>resetPW(b.dataset.uid,b.dataset.name)));
     el.querySelectorAll('[data-action="delete"]').forEach(b=>b.addEventListener('click',()=>deleteUser(b.dataset.uid,b.dataset.name)));
-    loadUsersTabLeaderboard();
   }
 
 
