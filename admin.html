@@ -104,7 +104,24 @@
         </div>
       </div>
       <div class="card-body">
-        <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <input id="users-search" type="text" placeholder="🔍 Search by name or username…"
+        style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--cream-dark);border-radius:8px;font-size:0.9rem;font-family:inherit;background:var(--white);"
+        oninput="renderUsers()">
+      <select id="users-role-filter" onchange="renderUsers()"
+        style="padding:8px 12px;border:1.5px solid var(--cream-dark);border-radius:8px;font-size:0.9rem;font-family:inherit;background:var(--white);cursor:pointer;">
+        <option value="">All roles</option>
+        <option value="user">Players</option>
+        <option value="admin">Admins</option>
+      </select>
+      <select id="users-sort" onchange="renderUsers()"
+        style="padding:8px 12px;border:1.5px solid var(--cream-dark);border-radius:8px;font-size:0.9rem;font-family:inherit;background:var(--white);cursor:pointer;">
+        <option value="name-asc">Name A→Z</option>
+        <option value="name-desc">Name Z→A</option>
+        <option value="role">Role</option>
+      </select>
+    </div>
+    <div id="users-list"><div class="loading-center"><div class="loading-spinner"></div><span>Loading players…</span></div></div>
       </div>
     </div>
 
@@ -447,15 +464,42 @@ const firebaseConfig = {
     }
   }
 
-  function renderUsers() {
-    const el = document.getElementById('users-list');
+  window.renderUsers = function renderUsers() {
+    const el         = document.getElementById('users-list');
+    const searchEl   = document.getElementById('users-search');
+    const filterEl   = document.getElementById('users-role-filter');
+    const sortEl     = document.getElementById('users-sort');
+    const query      = (searchEl?.value||'').toLowerCase().trim();
+    const roleFilter = filterEl?.value || '';
+    const sortBy     = sortEl?.value || 'name-asc';
+
     if (!allUsers.length) {
       el.innerHTML='<div class="empty-state"><div class="empty-icon">👤</div><h3>No players yet</h3><p>Click "+ Add Player" to get started</p></div>';
       return;
     }
+
+    let filtered = allUsers.filter(u => {
+      const name     = (u.displayName||'').toLowerCase();
+      const username = (u.username||'').toLowerCase();
+      const matchQ   = !query || name.includes(query) || username.includes(query);
+      const matchR   = !roleFilter || u.role === roleFilter;
+      return matchQ && matchR;
+    });
+
+    filtered.sort((a, b) => {
+      if (sortBy === 'name-desc') return (b.displayName||'').localeCompare(a.displayName||'');
+      if (sortBy === 'role')      return (a.role||'').localeCompare(b.role||'') || (a.displayName||'').localeCompare(b.displayName||'');
+      return (a.displayName||'').localeCompare(b.displayName||''); // name-asc default
+    });
+
+    if (!filtered.length) {
+      el.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);">No players match your search.</div>`;
+      return;
+    }
+
     el.innerHTML = `<div class="table-wrapper"><table>
       <thead><tr><th>Player</th><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
-      <tbody>${allUsers.map(u=>`
+      <tbody>${filtered.map(u=>`
         <tr>
           <td><div class="user-info"><div class="user-avatar">${(u.displayName||'U')[0].toUpperCase()}</div>
           <div class="user-name">${esc(u.displayName||'—')}</div></div></td>
