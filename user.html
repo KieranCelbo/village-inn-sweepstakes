@@ -748,7 +748,14 @@ const firebaseConfig = {
       const placeHint = racePlaces + ' place' + (racePlaces !== 1 ? 's' : '');
 
       const horsesHtml = locked
-        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? (() => { const r = (race.runners||[]).find(r => horseMatch(r.name, myPick.horseName)); const oddsStr = r?.odds ? ` <span style="color:var(--text-muted);font-weight:400;">(${r.odds})</span>` : ''; return ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>${oddsStr}`; })() : ' — no pick made'}</div>`
+        ? `<div class="race-locked-msg">🔒 Race locked${myPick ? (() => {
+              const r = (race.runners||[]).find(r => horseMatch(r.name, myPick.horseName));
+              const oddsStr = r?.odds ? ` <span style="color:var(--text-muted);font-weight:400;">(${r.odds})</span>` : '';
+              const nrNote  = myPick.nrSubstitute
+                ? ` <span style="background:var(--gold);color:var(--dark);font-size:0.7rem;padding:1px 6px;border-radius:8px;font-weight:700;" title="Original pick ${esc(myPick.nrOriginal||'')} was a non-runner">🔄 NR Sub</span>`
+                : '';
+              return ` — your pick: <strong style="margin-left:4px">${esc(myPick.horseName)}</strong>${oddsStr}${nrNote}`;
+            })() : ' — no pick made'}</div>`
         : `<div class="horses-grid">
             ${(race.runners || []).map(horse => {
               const isPicked = myPick?.horseName === horse.name;
@@ -794,7 +801,7 @@ const firebaseConfig = {
             <div class="race-status-area">
               ${locked
                 ? `<span class="lock-badge">🔒 Locked</span>
-                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)}</div>` : ''}`
+                   ${myPick ? `<div class="picked-badge">✅ ${esc(myPick.horseName)}${myPick.nrSubstitute ? ' <span style="font-size:0.7rem;background:var(--gold);color:var(--dark);padding:1px 5px;border-radius:6px;font-weight:700;">NR Sub</span>' : ''}</div>` : ''}`
                 : `<span class="lock-badge open">🟢 Open</span>
                    <span class="countdown ${urgent?'urgent':''}">${formatTimeUntil(timeUntil)}</span>`}
             </div>
@@ -891,7 +898,7 @@ const firebaseConfig = {
                 <div class="pick-row">
                   <div class="pick-time">${race.time}</div>
                   <div>
-                    <div class="pick-horse">${esc(pick.horseName)}${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.8rem;font-weight:400;">${r.odds}</span>` : ''; })()}</div>
+                    <div class="pick-horse">${esc(pick.horseName)}${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.8rem;font-weight:400;">${r.odds}</span>` : ''; })()}${pick.nrSubstitute ? ` <span style="font-size:0.7rem;background:rgba(201,168,76,0.2);color:var(--gold-dark);padding:1px 5px;border-radius:6px;font-weight:700;" title="Original pick: ${esc(pick.nrOriginal||'')}">🔄 NR→Fav</span>` : ''}</div>
                     <div class="pick-race">${esc(race.name)}</div>
                   </div>
                   ${badgeHtml}

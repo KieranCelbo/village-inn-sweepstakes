@@ -1124,7 +1124,7 @@ const firebaseConfig = {
                     const user = allUsers.find(u => u.id === pick.userId);
                     return `<tr>
                       <td>${esc(user?.displayName||'Unknown')}</td>
-                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()}</td>
+                      <td><strong>${esc(pick.horseName)}</strong>${(() => { const r = (race.runners||[]).find(r => horseMatch(r.name, pick.horseName)); return r?.odds ? ` <span style="color:var(--text-muted);font-size:0.82rem;">(${r.odds})</span>` : ''; })()}${pick.nrSubstitute ? ` <span style="font-size:0.7rem;background:rgba(201,168,76,0.2);color:var(--gold-dark);padding:1px 5px;border-radius:6px;font-weight:700;" title="NR: ${esc(pick.nrOriginal||'')}">🔄 NR→Fav</span>` : ''}</td>
                       <td>${outcomeLabel(pick)}</td>
                     </tr>`;
                   }).join('')}
