@@ -597,7 +597,7 @@ const firebaseConfig = {
       return r ? r.ew_denom : 4;
     }
 
-    // Points system: 1st=7pts, 2nd=4pts, 3rd=2pts, 4th=1pt (if paid)
+    // Points system: 1st=7pts, 2nd=4pts, 3rd=2pts, 4th=1pt, 5th=1pt (if paid)
     function calcPoints(race, horseName) {
       if (!race.result || !horseName) return 0;
       const places  = getRacePlaces(race);
@@ -606,6 +606,7 @@ const firebaseConfig = {
       if (places >= 2 && horseMatch(horseName, second))              return 4;
       if (places >= 3 && horseMatch(horseName, third))               return 2;
       if (places >= 4 && horseMatch(horseName, fourth))              return 1;
+      if (places >= 5 && horseMatch(horseName, fifth))               return 1;
       return 0;
     }
 
