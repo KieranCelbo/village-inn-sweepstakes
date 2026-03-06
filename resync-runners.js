@@ -14,7 +14,7 @@ const RACING_AUTH = 'Basic ' + Buffer.from(
   `${process.env.RACING_API_USER}:${process.env.RACING_API_PASS}`
 ).toString('base64');
 
-function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+function normHorse(name) { return String(name||'').replace(/(?:\s*\([^)]+\))+\s*$/,'').trim().toLowerCase(); }
 
 async function callAPI(path) {
   return new Promise((resolve, reject) => {

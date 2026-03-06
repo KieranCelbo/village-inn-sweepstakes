@@ -19,7 +19,7 @@ const RACING_AUTH = 'Basic ' + Buffer.from(
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normName(name) {
-  return String(name || '').replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim().toLowerCase();
+  return String(name || '').replace(/(?:\s*\([^)]+\))+\s*$/, '').trim().toLowerCase();
 }
 
 function namesMatch(a, b) {

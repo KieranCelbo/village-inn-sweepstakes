@@ -323,7 +323,7 @@ const firebaseConfig = {
   function normHorse(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
   function horseMatch(a,b) { return normHorse(a)===normHorse(b); }
   // Strip country suffix from venue names e.g. "Fairyhouse (IRE)" → "fairyhouse"
-  function normVenue(name) { return String(name||'').replace(/\s*\([A-Z]{2,3}\)\s*$/,'').trim().toLowerCase(); }
+  function normVenue(name) { return String(name||'').replace(/(?:\s*\([^)]+\))+\s*$/,'').trim().toLowerCase(); }
   function venueMatch(a,b) { return normVenue(a)===normVenue(b); }
 
   // Place rules: 1-7 = 2 paid places (W+1), 8-14 = 3 paid places (W+2), 15+ = 4 paid places (W+3)
