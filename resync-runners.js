@@ -65,8 +65,7 @@ async function resyncRunners() {
   const data = await callAPI(`/racecards/standard${day === 'tomorrow' ? '?day=tomorrow' : ''}`);
 
   const venueRaces = (data.racecards||[]).filter(r =>
-    (r.course||'').toLowerCase().replace(/\s*\([a-z]{2,3}\)\s*$/, '').trim() ===
-    meeting.venue.toLowerCase().trim()
+    normHorse(r.course||'') === normHorse(meeting.venue)
   );
 
   if (!venueRaces.length) {
